@@ -1,0 +1,19 @@
+{
+  "name": "vendra",
+  "private": true,
+  "packageManager": "pnpm@10.12.3",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build --concurrency=1",
+    "typecheck": "turbo run typecheck --concurrency=2",
+    "test": "turbo run test --concurrency=2",
+    "contract": "pnpm --filter @vendra/api openapi:export && pnpm --filter @vendra/api-client generate",
+    "infra:up": "docker compose -f infrastructure/docker/docker-compose.yml up -d",
+    "infra:down": "docker compose -f infrastructure/docker/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.10",
+    "typescript": "~5.9.3"
+  }
+}

@@ -1,0 +1,114 @@
+import { Money } from '../../../shared-kernel';
+import { Payment, ProviderVerification } from './payment';
+
+const now = new Date('2026-11-11T10:00:00Z');
+const ngn = (minor: bigint) => Money.of(minor, 'NGN');
+const newPayment = () =>
+  Payment.initiate({ id: 'p1', orderId: 'o1', reference: 'ref1', provider: 'test', amount: ngn(10_000n) });
+const result = (over: Partial<ProviderVerification> = {}): ProviderVerification => ({
+  outcome: 'succeeded',
+  amount: ngn(10_000n),
+  providerTransactionId: 'tx1',
+  ...over,
+});
+const types = (payment: Payment) => payment.pullEvents().map((event) => event.type);
+
+describe('Payment', () => {
+  it('rejects a non-positive amount', () => {
+    expect(() =>
+      Payment.initiate({ id: 'p', orderId: 'o', reference: 'r', provider: 't', amount: ngn(0n) }),
+    ).toThrow('positive');
+  });
+
+  it('succeeds on a matching verification', () => {
+    const payment = newPayment();
+    payment.applyVerification(result(), now);
+    expect(payment.snapshot.status).toBe('succeeded');
+    expect(types(payment)).toEqual(['PaymentSucceeded']);
+  });
+
+  it('is idempotent when the same success is verified twice', () => {
+    const payment = newPayment();
+    payment.applyVerification(result(), now);
+    payment.pullEvents();
+    payment.applyVerification(result(), now);
+    expect(payment.snapshot.status).toBe('succeeded');
+    expect(types(payment)).toEqual([]);
+  });
+
+  it.each([
+    ['underpayment', ngn(9_999n)],
+    ['overpayment', ngn(10_001n)],
+    ['wrong currency', Money.of(10_000n, 'USD')],
+  ])('flags %s for review and does not succeed', (_name, amount) => {
+    const payment = newPayment();
+    payment.applyVerification(result({ amount }), now);
+    expect(payment.snapshot.status).toBe('requires_review');
+    expect(types(payment)).toEqual(['PaymentFlaggedForReview']);
+  });
+
+  it('does not auto-resolve a payment under review', () => {
+    const payment = newPayment();
+    payment.applyVerification(result({ amount: ngn(1n) }), now);
+    payment.pullEvents();
+    payment.applyVerification(result(), now);
+    expect(payment.snapshot.status).toBe('requires_review');
+    expect(types(payment)).toEqual([]);
+  });
+
+  it('leaves state alone while the provider reports pending', () => {
+    const payment = newPayment();
+    payment.applyVerification(result({ outcome: 'pending' }), now);
+    expect(payment.snapshot.status).toBe('initiated');
+    expect(types(payment)).toEqual([]);
+  });
+
+  it('honours a late success after a failure', () => {
+    const payment = newPayment();
+    payment.applyVerification(result({ outcome: 'failed' }), now);
+    payment.applyVerification(result(), now);
+    expect(payment.snapshot.status).toBe('succeeded');
+    expect(types(payment)).toEqual(['PaymentFailed', 'PaymentSucceeded']);
+  });
+
+  it('raises a conflict and keeps state when a settled payment is contradicted', () => {
+    const payment = newPayment();
+    payment.applyVerification(result(), now);
+    payment.pullEvents();
+    payment.applyVerification(result({ outcome: 'failed' }), now);
+    expect(payment.snapshot.status).toBe('succeeded');
+    expect(types(payment)).toEqual(['PaymentVerificationConflict']);
+  });
+
+  describe('refunds', () => {
+    const settled = () => {
+      const payment = newPayment();
+      payment.applyVerification(result(), now);
+      payment.pullEvents();
+      return payment;
+    };
+
+    it('tracks partial then full refunds', () => {
+      const payment = settled();
+      payment.recordRefund(ngn(4_000n), now);
+      expect(payment.snapshot.status).toBe('partially_refunded');
+      payment.recordRefund(ngn(6_000n), now);
+      expect(payment.snapshot.status).toBe('refunded');
+    });
+
+    it('rejects cumulative refunds above the captured amount', () => {
+      const payment = settled();
+      payment.recordRefund(ngn(6_000n), now);
+      expect(() => payment.recordRefund(ngn(4_001n), now)).toThrow('exceed');
+      expect(payment.snapshot.refunded.minor).toBe(6_000n);
+    });
+
+    it('rejects refunding an unpaid payment', () => {
+      expect(() => newPayment().recordRefund(ngn(1n), now)).toThrow('Cannot refund');
+    });
+
+    it('rejects a zero refund', () => {
+      expect(() => settled().recordRefund(ngn(0n), now)).toThrow('positive');
+    });
+  });
+});

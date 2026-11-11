@@ -1,0 +1,656 @@
+// One Postgres schema per module group. Foreign keys never cross a schema:
+// cross-context references are plain UUID columns. See docs/architecture/data-ownership.md.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+  schemas   = ["platform", "identity", "customers", "sellers", "catalogue", "inventory", "cart", "orders", "payments", "ledger", "shipping"]
+}
+
+// ---------- platform ----------
+
+model OutboxEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  type        String
+  aggregateId String    @db.Uuid
+  payload     Json
+  occurredAt  DateTime  @db.Timestamptz
+  publishedAt DateTime? @db.Timestamptz
+  attempts    Int       @default(0)
+  lastError   String?
+
+  @@index([publishedAt, occurredAt])
+  @@map("outbox_events")
+  @@schema("platform")
+}
+
+model IdempotencyRecord {
+  id           String   @id @default(uuid()) @db.Uuid
+  scope        String
+  key          String
+  requestHash  String
+  responseCode Int?
+  responseBody Json?
+  createdAt    DateTime @default(now()) @db.Timestamptz
+
+  @@unique([scope, key])
+  @@map("idempotency_records")
+  @@schema("platform")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @db.Uuid
+  action     String
+  targetType String
+  targetId   String
+  before     Json?
+  after      Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now()) @db.Timestamptz
+
+  @@index([targetType, targetId])
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
+  @@schema("platform")
+}
+
+// ---------- identity ----------
+
+enum AccountAudience {
+  store
+  admin
+  vendor
+
+  @@schema("identity")
+}
+
+model Account {
+  id           String          @id @default(uuid()) @db.Uuid
+  audience     AccountAudience
+  email        String
+  phone        String?
+  passwordHash String
+  status       String          @default("active")
+  mfaSecret    String?
+  createdAt    DateTime        @default(now()) @db.Timestamptz
+  updatedAt    DateTime        @updatedAt @db.Timestamptz
+  sessions     Session[]
+  roles        AccountRole[]
+
+  @@unique([audience, email])
+  @@map("accounts")
+  @@schema("identity")
+}
+
+model Session {
+  id               String    @id @default(uuid()) @db.Uuid
+  accountId        String    @db.Uuid
+  familyId         String    @db.Uuid
+  refreshTokenHash String    @unique
+  expiresAt        DateTime  @db.Timestamptz
+  revokedAt        DateTime? @db.Timestamptz
+  createdAt        DateTime  @default(now()) @db.Timestamptz
+  account          Account   @relation(fields: [accountId], references: [id])
+
+  @@index([familyId])
+  @@map("sessions")
+  @@schema("identity")
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String           @unique
+  permissions RolePermission[]
+  accounts    AccountRole[]
+
+  @@map("roles")
+  @@schema("identity")
+}
+
+model RolePermission {
+  roleId     String @db.Uuid
+  permission String
+  role       Role   @relation(fields: [roleId], references: [id])
+
+  @@id([roleId, permission])
+  @@map("role_permissions")
+  @@schema("identity")
+}
+
+model AccountRole {
+  accountId String  @db.Uuid
+  roleId    String  @db.Uuid
+  account   Account @relation(fields: [accountId], references: [id])
+  role      Role    @relation(fields: [roleId], references: [id])
+
+  @@id([accountId, roleId])
+  @@map("account_roles")
+  @@schema("identity")
+}
+
+// ---------- customers ----------
+
+model CustomerProfile {
+  id        String    @id @default(uuid()) @db.Uuid
+  accountId String    @unique @db.Uuid
+  firstName String
+  lastName  String
+  createdAt DateTime  @default(now()) @db.Timestamptz
+  addresses Address[]
+
+  @@map("customer_profiles")
+  @@schema("customers")
+}
+
+model Address {
+  id         String          @id @default(uuid()) @db.Uuid
+  customerId String          @db.Uuid
+  recipient  String
+  phone      String
+  line1      String
+  line2      String?
+  city       String
+  state      String
+  country    String          @default("NG")
+  isDefault  Boolean         @default(false)
+  customer   CustomerProfile @relation(fields: [customerId], references: [id])
+
+  @@index([customerId])
+  @@map("addresses")
+  @@schema("customers")
+}
+
+// ---------- sellers ----------
+
+enum SellerType {
+  first_party
+  marketplace
+  supplier
+
+  @@schema("sellers")
+}
+
+model Seller {
+  id           String     @id @default(uuid()) @db.Uuid
+  type         SellerType
+  displayName  String
+  legalName    String
+  status       String     @default("pending_verification")
+  ownerAccount String?    @db.Uuid
+  createdAt    DateTime   @default(now()) @db.Timestamptz
+  cases        VerificationCase[]
+
+  @@map("sellers")
+  @@schema("sellers")
+}
+
+model VerificationCase {
+  id         String    @id @default(uuid()) @db.Uuid
+  sellerId   String    @db.Uuid
+  status     String    @default("submitted")
+  documents  Json
+  reviewedBy String?   @db.Uuid
+  reviewedAt DateTime? @db.Timestamptz
+  notes      String?
+  createdAt  DateTime  @default(now()) @db.Timestamptz
+  seller     Seller    @relation(fields: [sellerId], references: [id])
+
+  @@index([sellerId])
+  @@map("verification_cases")
+  @@schema("sellers")
+}
+
+// ---------- catalogue (including listings) ----------
+
+model Category {
+  id              String     @id @default(uuid()) @db.Uuid
+  parentId        String?    @db.Uuid
+  name            String
+  slug            String     @unique
+  attributeSchema Json?
+  parent          Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children        Category[] @relation("CategoryTree")
+  products        Product[]
+
+  @@map("categories")
+  @@schema("catalogue")
+}
+
+model Brand {
+  id       String    @id @default(uuid()) @db.Uuid
+  name     String    @unique
+  slug     String    @unique
+  products Product[]
+
+  @@map("brands")
+  @@schema("catalogue")
+}
+
+model Product {
+  id          String           @id @default(uuid()) @db.Uuid
+  categoryId  String           @db.Uuid
+  brandId     String?          @db.Uuid
+  name        String
+  slug        String           @unique
+  description String
+  attributes  Json             @default("{}")
+  images      Json             @default("[]")
+  status      String           @default("draft")
+  createdAt   DateTime         @default(now()) @db.Timestamptz
+  updatedAt   DateTime         @updatedAt @db.Timestamptz
+  category    Category         @relation(fields: [categoryId], references: [id])
+  brand       Brand?           @relation(fields: [brandId], references: [id])
+  variants    ProductVariant[]
+
+  @@index([categoryId, status])
+  @@map("products")
+  @@schema("catalogue")
+}
+
+model ProductVariant {
+  id         String    @id @default(uuid()) @db.Uuid
+  productId  String    @db.Uuid
+  sku        String    @unique
+  options    Json      @default("{}")
+  weightGrams Int
+  product    Product   @relation(fields: [productId], references: [id])
+  listings   Listing[]
+
+  @@index([productId])
+  @@map("product_variants")
+  @@schema("catalogue")
+}
+
+model Listing {
+  id         String         @id @default(uuid()) @db.Uuid
+  variantId  String         @db.Uuid
+  sellerId   String         @db.Uuid
+  priceMinor BigInt
+  currency   String         @db.Char(3)
+  status     String         @default("draft")
+  version    Int            @default(0)
+  variant    ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@unique([variantId, sellerId])
+  @@index([sellerId, status])
+  @@map("listings")
+  @@schema("catalogue")
+}
+
+// ---------- inventory (including warehousing) ----------
+
+model Warehouse {
+  id       String      @id @default(uuid()) @db.Uuid
+  sellerId String      @db.Uuid
+  name     String
+  address  Json
+  stock    StockItem[]
+
+  @@map("warehouses")
+  @@schema("inventory")
+}
+
+model StockItem {
+  id           String             @id @default(uuid()) @db.Uuid
+  listingId    String             @db.Uuid
+  warehouseId  String             @db.Uuid
+  onHand       Int                @default(0)
+  reserved     Int                @default(0)
+  version      Int                @default(0)
+  warehouse    Warehouse          @relation(fields: [warehouseId], references: [id])
+  reservations StockReservation[]
+  movements    StockMovement[]
+
+  @@unique([listingId, warehouseId])
+  @@map("stock_items")
+  @@schema("inventory")
+}
+
+model StockReservation {
+  id          String    @id @default(uuid()) @db.Uuid
+  stockItemId String    @db.Uuid
+  checkoutId  String    @db.Uuid
+  quantity    Int
+  status      String    @default("held")
+  expiresAt   DateTime  @db.Timestamptz
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id])
+
+  @@index([status, expiresAt])
+  @@index([checkoutId])
+  @@map("stock_reservations")
+  @@schema("inventory")
+}
+
+model StockMovement {
+  id          String    @id @default(uuid()) @db.Uuid
+  stockItemId String    @db.Uuid
+  delta       Int
+  reason      String
+  sourceType  String
+  sourceId    String
+  createdAt   DateTime  @default(now()) @db.Timestamptz
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id])
+
+  @@index([stockItemId, createdAt])
+  @@map("stock_movements")
+  @@schema("inventory")
+}
+
+// ---------- cart ----------
+
+model Cart {
+  id         String     @id @default(uuid()) @db.Uuid
+  customerId String?    @db.Uuid
+  guestToken String?    @unique
+  updatedAt  DateTime   @updatedAt @db.Timestamptz
+  items      CartItem[]
+
+  @@index([customerId])
+  @@map("carts")
+  @@schema("cart")
+}
+
+model CartItem {
+  id        String @id @default(uuid()) @db.Uuid
+  cartId    String @db.Uuid
+  listingId String @db.Uuid
+  quantity  Int
+  cart      Cart   @relation(fields: [cartId], references: [id])
+
+  @@unique([cartId, listingId])
+  @@map("cart_items")
+  @@schema("cart")
+}
+
+// ---------- orders ----------
+
+model Order {
+  id              String        @id @default(uuid()) @db.Uuid
+  number          String        @unique
+  customerId      String        @db.Uuid
+  status          String        @default("pending_payment")
+  currency        String        @db.Char(3)
+  subtotalMinor   BigInt
+  deliveryMinor   BigInt
+  discountMinor   BigInt        @default(0)
+  totalMinor      BigInt
+  shippingAddress Json
+  version         Int           @default(0)
+  createdAt       DateTime      @default(now()) @db.Timestamptz
+  updatedAt       DateTime      @updatedAt @db.Timestamptz
+  sellerOrders    SellerOrder[]
+
+  @@index([customerId, createdAt])
+  @@map("orders")
+  @@schema("orders")
+}
+
+model SellerOrder {
+  id       String      @id @default(uuid()) @db.Uuid
+  orderId  String      @db.Uuid
+  sellerId String      @db.Uuid
+  status   String      @default("pending")
+  version  Int         @default(0)
+  order    Order       @relation(fields: [orderId], references: [id])
+  lines    OrderLine[]
+
+  @@index([orderId])
+  @@index([sellerId, status])
+  @@map("seller_orders")
+  @@schema("orders")
+}
+
+model OrderLine {
+  id             String      @id @default(uuid()) @db.Uuid
+  sellerOrderId  String      @db.Uuid
+  listingId      String      @db.Uuid
+  productName    String
+  sku            String
+  quantity       Int
+  unitPriceMinor BigInt
+  sellerOrder    SellerOrder @relation(fields: [sellerOrderId], references: [id])
+
+  @@index([sellerOrderId])
+  @@map("order_lines")
+  @@schema("orders")
+}
+
+// ---------- payments ----------
+
+enum PaymentStatus {
+  initiated
+  succeeded
+  failed
+  requires_review
+  partially_refunded
+  refunded
+
+  @@schema("payments")
+}
+
+model Payment {
+  id                    String           @id @default(uuid()) @db.Uuid
+  orderId               String           @db.Uuid
+  reference             String           @unique
+  provider              String
+  amountMinor           BigInt
+  currency              String           @db.Char(3)
+  status                PaymentStatus    @default(initiated)
+  providerTransactionId String?
+  refundedMinor         BigInt           @default(0)
+  version               Int              @default(0)
+  createdAt             DateTime         @default(now()) @db.Timestamptz
+  updatedAt             DateTime         @updatedAt @db.Timestamptz
+  attempts              PaymentAttempt[]
+  refunds               Refund[]
+
+  @@unique([provider, providerTransactionId])
+  @@index([orderId])
+  @@map("payments")
+  @@schema("payments")
+}
+
+model PaymentAttempt {
+  id        String   @id @default(uuid()) @db.Uuid
+  paymentId String   @db.Uuid
+  outcome   String
+  response  Json
+  createdAt DateTime @default(now()) @db.Timestamptz
+  payment   Payment  @relation(fields: [paymentId], references: [id])
+
+  @@index([paymentId])
+  @@map("payment_attempts")
+  @@schema("payments")
+}
+
+model WebhookEvent {
+  id              String    @id @default(uuid()) @db.Uuid
+  provider        String
+  providerEventId String
+  receivedAt      DateTime  @default(now()) @db.Timestamptz
+  processedAt     DateTime? @db.Timestamptz
+
+  @@unique([provider, providerEventId])
+  @@map("webhook_events")
+  @@schema("payments")
+}
+
+model Refund {
+  id               String   @id @default(uuid()) @db.Uuid
+  paymentId        String   @db.Uuid
+  amountMinor      BigInt
+  currency         String   @db.Char(3)
+  status           String   @default("pending")
+  providerRefundId String?
+  reason           String
+  requestedBy      String   @db.Uuid
+  createdAt        DateTime @default(now()) @db.Timestamptz
+  payment          Payment  @relation(fields: [paymentId], references: [id])
+
+  @@index([paymentId])
+  @@map("refunds")
+  @@schema("payments")
+}
+
+// ---------- ledger (append-only, enforced by database triggers) ----------
+
+enum LedgerSide {
+  debit
+  credit
+
+  @@schema("ledger")
+}
+
+model LedgerAccount {
+  code  String        @id
+  name  String
+  type  String
+  lines JournalLine[]
+
+  @@map("accounts")
+  @@schema("ledger")
+}
+
+model JournalEntry {
+  id         String        @id @default(uuid()) @db.Uuid
+  sourceType String
+  sourceId   String
+  postedAt   DateTime      @db.Timestamptz
+  lines      JournalLine[]
+
+  @@unique([sourceType, sourceId])
+  @@map("journal_entries")
+  @@schema("ledger")
+}
+
+model JournalLine {
+  id          String        @id @default(uuid()) @db.Uuid
+  entryId     String        @db.Uuid
+  accountCode String
+  side        LedgerSide
+  amountMinor BigInt
+  currency    String        @db.Char(3)
+  entry       JournalEntry  @relation(fields: [entryId], references: [id])
+  account     LedgerAccount @relation(fields: [accountCode], references: [code])
+
+  @@index([entryId])
+  @@index([accountCode])
+  @@map("journal_lines")
+  @@schema("ledger")
+}
+
+// ---------- shipping (including logistics) ----------
+
+enum FulfilmentMode {
+  vendra_dispatch
+  carrier
+  vendor_managed
+  supplier_managed
+
+  @@schema("shipping")
+}
+
+enum ShipmentStatus {
+  created
+  allocated
+  picked_up
+  in_transit
+  out_for_delivery
+  delivered
+  delivery_failed
+  returning
+  returned
+  cancelled
+
+  @@schema("shipping")
+}
+
+model DeliveryZone {
+  id     String         @id @default(uuid()) @db.Uuid
+  code   String         @unique
+  name   String
+  states String[]
+  rates  DeliveryRate[]
+
+  @@map("delivery_zones")
+  @@schema("shipping")
+}
+
+model DeliveryRate {
+  id            String       @id @default(uuid()) @db.Uuid
+  zoneId        String       @db.Uuid
+  maxWeightGrams Int
+  priceMinor    BigInt
+  currency      String       @db.Char(3)
+  zone          DeliveryZone @relation(fields: [zoneId], references: [id])
+
+  @@unique([zoneId, maxWeightGrams])
+  @@map("delivery_rates")
+  @@schema("shipping")
+}
+
+model Shipment {
+  id                String            @id @default(uuid()) @db.Uuid
+  sellerOrderId     String            @db.Uuid
+  mode              FulfilmentMode
+  status            ShipmentStatus    @default(created)
+  provider          String
+  trackingReference String?           @unique
+  version           Int               @default(0)
+  createdAt         DateTime          @default(now()) @db.Timestamptz
+  items             ShipmentItem[]
+  history           ShipmentStatusEvent[]
+  attempts          DeliveryAttempt[]
+
+  @@index([sellerOrderId])
+  @@index([status])
+  @@map("shipments")
+  @@schema("shipping")
+}
+
+model ShipmentItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  shipmentId  String   @db.Uuid
+  orderLineId String   @db.Uuid
+  quantity    Int
+  shipment    Shipment @relation(fields: [shipmentId], references: [id])
+
+  @@unique([shipmentId, orderLineId])
+  @@map("shipment_items")
+  @@schema("shipping")
+}
+
+model ShipmentStatusEvent {
+  id         String         @id @default(uuid()) @db.Uuid
+  shipmentId String         @db.Uuid
+  sequence   Int
+  status     ShipmentStatus
+  note       String?
+  at         DateTime       @db.Timestamptz
+  shipment   Shipment       @relation(fields: [shipmentId], references: [id])
+
+  @@unique([shipmentId, sequence])
+  @@index([shipmentId, at])
+  @@map("shipment_status_events")
+  @@schema("shipping")
+}
+
+model DeliveryAttempt {
+  id            String   @id @default(uuid()) @db.Uuid
+  shipmentId    String   @db.Uuid
+  attemptNumber Int
+  successful    Boolean
+  reason        String?
+  at            DateTime @db.Timestamptz
+  shipment      Shipment @relation(fields: [shipmentId], references: [id])
+
+  @@unique([shipmentId, attemptNumber])
+  @@map("delivery_attempts")
+  @@schema("shipping")
+}

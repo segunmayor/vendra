@@ -1,0 +1,5 @@
+{
+  "extends": "@vendra/config/tsconfig/node.json",
+  "compilerOptions": { "types": ["node", "jest"], "rootDir": "." },
+  "include": ["src", "test"]
+}

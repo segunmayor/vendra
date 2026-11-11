@@ -1,0 +1,23 @@
+# Local development dependencies only. Non-default ports avoid clashes with host services.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: vendra
+      POSTGRES_PASSWORD: vendra_local
+      POSTGRES_DB: vendra_dev
+    ports: ["127.0.0.1:55432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+  redis:
+    image: redis:7.4-alpine
+    ports: ["127.0.0.1:56379:6379"]
+  meilisearch:
+    image: getmeili/meilisearch:v1.16
+    environment:
+      MEILI_MASTER_KEY: vendra_local_master_key_for_development
+    ports: ["127.0.0.1:57700:7700"]
+    volumes: ["meili_data:/meili_data"]
+
+volumes:
+  postgres_data:
+  meili_data:

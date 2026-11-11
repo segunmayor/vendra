@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://unused:unused@127.0.0.1:1/unused
+      DIRECT_DATABASE_URL: postgresql://unused:unused@127.0.0.1:1/unused
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - name: API contract is up to date
+        run: pnpm contract && git diff --exit-code packages/api-client
+
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: vendra
+          POSTGRES_PASSWORD: vendra_ci
+          POSTGRES_DB: vendra_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U vendra" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://vendra:vendra_ci@localhost:5432/vendra_test
+      DIRECT_DATABASE_URL: postgresql://vendra:vendra_ci@localhost:5432/vendra_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @vendra/api exec prisma migrate deploy
+      - run: pnpm --filter @vendra/api test:integration
+
+  images:
+    needs: [verify, integration]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { app: customer, file: portal }
+          - { app: admin, file: portal }
+          - { app: vendor, file: portal }
+          - { app: api, file: backend }
+          - { app: worker, file: backend }
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f infrastructure/docker/${{ matrix.file }}.Dockerfile --build-arg APP=${{ matrix.app }} -t vendra-${{ matrix.app }} .
