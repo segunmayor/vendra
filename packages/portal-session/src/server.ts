@@ -25,6 +25,9 @@ export type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; m
 /** Thrown when the API refuses a refresh token: the session is over and the user must sign in. */
 class SessionEnded extends Error {}
 
+/** The API could not be reached to refresh the session. */
+export class SessionUnavailable extends Error {}
+
 interface Settings {
   readonly apiBaseUrl: string;
   readonly portalSecret: string | undefined;
@@ -65,7 +68,17 @@ async function problemMessage(response: Response, fallback: string): Promise<str
   return isProblem(body) ? body.detail : fallback;
 }
 
-export function createPortalSession(audience: Audience, options: { loginPath?: string; homePath?: string } = {}) {
+export interface PortalSessionOptions {
+  readonly loginPath?: string;
+  readonly homePath?: string;
+  /**
+   * Runs after a successful sign-in or registration, with the new access token, for example to
+   * merge a guest basket. Its failure never fails the sign-in.
+   */
+  readonly onSignedIn?: (accessToken: string) => Promise<void>;
+}
+
+export function createPortalSession(audience: Audience, options: PortalSessionOptions = {}) {
   const loginPath = options.loginPath ?? '/login';
   const homePath = options.homePath ?? '/';
   const coalescer = sharedCoalescer<IssuedSession>(audience);
@@ -116,8 +129,33 @@ export function createPortalSession(audience: Audience, options: { loginPath?: s
       const fallback = kind === 'login' ? 'Incorrect email or password' : 'We could not create your account';
       return { ok: false, message: response.status >= 500 ? 'Something went wrong. Please try again.' : await problemMessage(response, fallback) };
     }
-    await writeSession((await response.json()) as IssuedSession);
+    const issued = (await response.json()) as IssuedSession;
+    await writeSession(issued);
+    if (options.onSignedIn) await options.onSignedIn(issued.accessToken).catch(() => undefined);
     return { ok: true, data: undefined };
+  }
+
+  /**
+   * For Server Actions: the access token, refreshed first if it has expired. Null when there is
+   * no session, or when it has ended. Throws SessionUnavailable if the API cannot be reached.
+   */
+  async function actionAccessToken(): Promise<string | null> {
+    const store = await cookies();
+    const current = store.get(names().access)?.value;
+    if (current) return current;
+    const refreshToken = store.get(names().refresh)?.value;
+    if (!refreshToken) return null;
+    try {
+      const session = await refreshWith(settings(), refreshToken);
+      await writeSession(session);
+      return session.accessToken;
+    } catch (error) {
+      if (error instanceof SessionEnded) {
+        await clearSession();
+        return null;
+      }
+      throw new SessionUnavailable();
+    }
   }
 
   /** Reads the signed-in profile once per render. Returns null when there is no valid session. */
@@ -148,6 +186,13 @@ export function createPortalSession(audience: Audience, options: { loginPath?: s
     },
 
     getProfile,
+
+    /** For pages that also work signed out: the access token if there is one. Never redirects or refreshes. */
+    async currentAccessToken(): Promise<string | null> {
+      return (await cookies()).get(names().access)?.value ?? null;
+    },
+
+    actionAccessToken,
 
     /** For pages: the signed-in profile, or a redirect to sign-in. */
     async requireProfile(): Promise<Profile> {
@@ -181,24 +226,14 @@ export function createPortalSession(audience: Audience, options: { loginPath?: s
     async mutate<T>(
       call: (api: VendraClient) => Promise<{ data?: T; error?: unknown; response: Response }>,
     ): Promise<ActionResult<T>> {
-      const store = await cookies();
       const config = settings();
-      let accessToken = store.get(names().access)?.value;
-      if (!accessToken) {
-        const refreshToken = store.get(names().refresh)?.value;
-        if (!refreshToken) return toLogin();
-        try {
-          const session = await refreshWith(config, refreshToken);
-          await writeSession(session);
-          accessToken = session.accessToken;
-        } catch (error) {
-          if (error instanceof SessionEnded) {
-            await clearSession();
-            return toLogin();
-          }
-          return { ok: false, message: 'We could not reach Vendra. Please try again in a moment.' };
-        }
+      let accessToken: string | null;
+      try {
+        accessToken = await actionAccessToken();
+      } catch {
+        return { ok: false, message: 'We could not reach Vendra. Please try again in a moment.' };
       }
+      if (!accessToken) return toLogin();
       let result: { data?: T; error?: unknown; response: Response };
       try {
         result = await call(client(config, accessToken));

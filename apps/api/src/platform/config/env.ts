@@ -8,6 +8,8 @@ const schema = z.object({
   /** Shared with the portals so they can pass on the visitor's IP address. */
   PORTAL_SHARED_SECRET: z.string().min(32).optional(),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).default(0),
+  /** How often lapsed stock reservations are released. 0 turns the sweep off (tests call it directly). */
+  RESERVATION_SWEEP_SECONDS: z.coerce.number().int().min(0).max(3600).default(60),
   CORS_ORIGINS: z
     .string()
     .default('')

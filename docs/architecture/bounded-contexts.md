@@ -46,4 +46,4 @@ Each aggregate has exactly one owner. Other modules hold its ID and call the own
 
 ## Implementation status
 
-`identity`, `catalogue`, `listings`, `inventory` and `storefront` are built with HTTP endpoints. `payments`, `ledger` and `shipping` have domain rules, ports and Prisma persistence, but no HTTP endpoints yet. `audit` is currently a write helper in `platform` plus a read endpoint in `identity`. Modules are created when they are built, so the tree has no empty placeholders.
+`identity`, `catalogue`, `listings`, `inventory`, `storefront`, `cart`, `checkout` and `logistics` are built with HTTP endpoints. `checkout` stores its sessions in the `cart` schema. `payments`, `ledger` and `shipping` have domain rules, ports and Prisma persistence, but no HTTP endpoints yet. `audit` is currently a write helper in `platform` plus a read endpoint in `identity`. Modules are created when they are built, so the tree has no empty placeholders.

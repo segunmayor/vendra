@@ -1757,6 +1757,519 @@
           "store catalogue"
         ]
       }
+    },
+    "/v1/store/cart": {
+      "get": {
+        "operationId": "storeGetCart",
+        "parameters": [
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Guest cart token, when not signed in",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "store cart"
+        ]
+      }
+    },
+    "/v1/store/cart/items": {
+      "post": {
+        "operationId": "storeAddCartItem",
+        "parameters": [
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Guest cart token, when not signed in",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "store cart"
+        ]
+      }
+    },
+    "/v1/store/cart/items/{listingId}": {
+      "put": {
+        "operationId": "storeSetCartItem",
+        "parameters": [
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Guest cart token, when not signed in",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "listingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetQuantityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "store cart"
+        ]
+      },
+      "delete": {
+        "operationId": "storeRemoveCartItem",
+        "parameters": [
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Guest cart token, when not signed in",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "listingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "store cart"
+        ]
+      }
+    },
+    "/v1/store/cart/merge": {
+      "post": {
+        "operationId": "storeMergeCart",
+        "parameters": [
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Guest cart token, when not signed in",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "store cart"
+        ]
+      }
+    },
+    "/v1/admin/delivery-zones": {
+      "get": {
+        "operationId": "adminListDeliveryZones",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeliveryZoneResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin delivery"
+        ]
+      },
+      "post": {
+        "operationId": "adminCreateDeliveryZone",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryZoneDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryZoneResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin delivery"
+        ]
+      }
+    },
+    "/v1/admin/delivery-zones/{id}": {
+      "put": {
+        "operationId": "adminUpdateDeliveryZone",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryZoneDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryZoneResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin delivery"
+        ]
+      }
+    },
+    "/v1/store/checkout/quote": {
+      "post": {
+        "operationId": "storeQuoteDelivery",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryQuoteResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delivery fee for the basket to a state. Reserves nothing.",
+        "tags": [
+          "store checkout"
+        ]
+      }
+    },
+    "/v1/store/checkout": {
+      "post": {
+        "operationId": "storeStartCheckout",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "One key per checkout attempt, reused on retry",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartCheckoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Prices the basket and holds its stock for payment",
+        "tags": [
+          "store checkout"
+        ]
+      }
+    },
+    "/v1/store/checkout/last-address": {
+      "get": {
+        "operationId": "storeLastCheckoutAddress",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LastAddressResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "store checkout"
+        ]
+      }
+    },
+    "/v1/store/checkout/{id}": {
+      "get": {
+        "operationId": "storeGetCheckout",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "store checkout"
+        ]
+      }
+    },
+    "/v1/store/checkout/{id}/cancel": {
+      "post": {
+        "operationId": "storeCancelCheckout",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancels the checkout and returns its stock to sale",
+        "tags": [
+          "store checkout"
+        ]
+      }
     }
   },
   "info": {
@@ -2895,6 +3408,529 @@
           "availability",
           "variants"
         ]
+      },
+      "CartLineResponse": {
+        "type": "object",
+        "properties": {
+          "listingId": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "productSlug": {
+            "type": "string",
+            "nullable": true
+          },
+          "sku": {
+            "type": "string",
+            "nullable": true
+          },
+          "options": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "image": {
+            "type": "string",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unitPrice": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MoneyDto"
+              }
+            ]
+          },
+          "lineTotal": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MoneyDto"
+              }
+            ]
+          },
+          "issue": {
+            "type": "string",
+            "enum": [
+              "unavailable",
+              "out_of_stock",
+              "insufficient_stock"
+            ],
+            "nullable": true
+          },
+          "availableQuantity": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "listingId",
+          "productName",
+          "options",
+          "quantity"
+        ]
+      },
+      "CartResponse": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CartLineResponse"
+            }
+          },
+          "itemCount": {
+            "type": "number"
+          },
+          "subtotal": {
+            "description": "Total of the lines that can be bought now",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MoneyDto"
+              }
+            ]
+          },
+          "canCheckout": {
+            "type": "boolean",
+            "description": "False if the cart is empty or any line has an issue"
+          },
+          "guestToken": {
+            "type": "string",
+            "description": "Returned once, when a guest cart is created. Send it back as X-Cart-Token."
+          },
+          "capped": {
+            "type": "boolean",
+            "description": "On merge: true if some quantities were reduced to the per-order limit"
+          }
+        },
+        "required": [
+          "lines",
+          "itemCount",
+          "subtotal",
+          "canCheckout"
+        ]
+      },
+      "AddItemDto": {
+        "type": "object",
+        "properties": {
+          "listingId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "listingId",
+          "quantity"
+        ]
+      },
+      "SetQuantityDto": {
+        "type": "object",
+        "properties": {
+          "quantity": {
+            "type": "number",
+            "minimum": 0,
+            "description": "0 removes the line"
+          }
+        },
+        "required": [
+          "quantity"
+        ]
+      },
+      "RateDto": {
+        "type": "object",
+        "properties": {
+          "maxWeightGrams": {
+            "type": "number"
+          },
+          "priceMinor": {
+            "type": "string",
+            "example": "250000",
+            "description": "Kobo, as a string"
+          }
+        },
+        "required": [
+          "maxWeightGrams",
+          "priceMinor"
+        ]
+      },
+      "DeliveryZoneResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "states": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Abia",
+                "Adamawa",
+                "Akwa Ibom",
+                "Anambra",
+                "Bauchi",
+                "Bayelsa",
+                "Benue",
+                "Borno",
+                "Cross River",
+                "Delta",
+                "Ebonyi",
+                "Edo",
+                "Ekiti",
+                "Enugu",
+                "FCT",
+                "Gombe",
+                "Imo",
+                "Jigawa",
+                "Kaduna",
+                "Kano",
+                "Katsina",
+                "Kebbi",
+                "Kogi",
+                "Kwara",
+                "Lagos",
+                "Nasarawa",
+                "Niger",
+                "Ogun",
+                "Ondo",
+                "Osun",
+                "Oyo",
+                "Plateau",
+                "Rivers",
+                "Sokoto",
+                "Taraba",
+                "Yobe",
+                "Zamfara"
+              ]
+            }
+          },
+          "rates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RateDto"
+            }
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "states",
+          "rates",
+          "id"
+        ]
+      },
+      "DeliveryZoneDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "states": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Abia",
+                "Adamawa",
+                "Akwa Ibom",
+                "Anambra",
+                "Bauchi",
+                "Bayelsa",
+                "Benue",
+                "Borno",
+                "Cross River",
+                "Delta",
+                "Ebonyi",
+                "Edo",
+                "Ekiti",
+                "Enugu",
+                "FCT",
+                "Gombe",
+                "Imo",
+                "Jigawa",
+                "Kaduna",
+                "Kano",
+                "Katsina",
+                "Kebbi",
+                "Kogi",
+                "Kwara",
+                "Lagos",
+                "Nasarawa",
+                "Niger",
+                "Ogun",
+                "Ondo",
+                "Osun",
+                "Oyo",
+                "Plateau",
+                "Rivers",
+                "Sokoto",
+                "Taraba",
+                "Yobe",
+                "Zamfara"
+              ]
+            }
+          },
+          "rates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RateDto"
+            }
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "states",
+          "rates"
+        ]
+      },
+      "QuoteDto": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "Abia",
+              "Adamawa",
+              "Akwa Ibom",
+              "Anambra",
+              "Bauchi",
+              "Bayelsa",
+              "Benue",
+              "Borno",
+              "Cross River",
+              "Delta",
+              "Ebonyi",
+              "Edo",
+              "Ekiti",
+              "Enugu",
+              "FCT",
+              "Gombe",
+              "Imo",
+              "Jigawa",
+              "Kaduna",
+              "Kano",
+              "Katsina",
+              "Kebbi",
+              "Kogi",
+              "Kwara",
+              "Lagos",
+              "Nasarawa",
+              "Niger",
+              "Ogun",
+              "Ondo",
+              "Osun",
+              "Oyo",
+              "Plateau",
+              "Rivers",
+              "Sokoto",
+              "Taraba",
+              "Yobe",
+              "Zamfara"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "DeliveryQuoteResponse": {
+        "type": "object",
+        "properties": {
+          "subtotal": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "delivery": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MoneyDto"
+              }
+            ]
+          },
+          "total": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MoneyDto"
+              }
+            ]
+          },
+          "problem": {
+            "type": "string",
+            "nullable": true,
+            "description": "Why delivery cannot be quoted"
+          }
+        },
+        "required": [
+          "subtotal"
+        ]
+      },
+      "StartCheckoutDto": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/AddressDto"
+          }
+        },
+        "required": [
+          "address"
+        ]
+      },
+      "CheckoutLineDto": {
+        "type": "object",
+        "properties": {
+          "listingId": {
+            "type": "string"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "options": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unitPrice": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "lineTotal": {
+            "$ref": "#/components/schemas/MoneyDto"
+          }
+        },
+        "required": [
+          "listingId",
+          "sku",
+          "productName",
+          "options",
+          "quantity",
+          "unitPrice",
+          "lineTotal"
+        ]
+      },
+      "SavedAddressResponse": {
+        "type": "object",
+        "properties": {
+          "recipient": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "line1": {
+            "type": "string"
+          },
+          "line2": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "recipient",
+          "phone",
+          "line1",
+          "city",
+          "state"
+        ]
+      },
+      "CheckoutResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "awaiting_payment",
+              "cancelled",
+              "expired",
+              "paid"
+            ]
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckoutLineDto"
+            }
+          },
+          "address": {
+            "$ref": "#/components/schemas/SavedAddressResponse"
+          },
+          "subtotal": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Stock is held until this time"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "lines",
+          "address",
+          "subtotal",
+          "delivery",
+          "total",
+          "expiresAt"
+        ]
+      },
+      "LastAddressResponse": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SavedAddressResponse"
+              }
+            ]
+          }
+        }
       }
     }
   }

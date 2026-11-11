@@ -30,6 +30,10 @@ export class PrismaListingRepository implements ListingRepository {
     return rows.map(toListing);
   }
 
+  async findByIds(ids: readonly string[]): Promise<Listing[]> {
+    return (await this.prisma.listing.findMany({ where: { id: { in: [...ids] } } })).map(toListing);
+  }
+
   async save(listing: Listing, audit: AuditEntry): Promise<void> {
     const state = listing.snapshot;
     const events = listing.pullEvents();

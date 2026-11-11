@@ -130,18 +130,25 @@ export class PrismaProductRepository implements ProductRepository {
   }
 
   async findVariant(id: string): Promise<VariantSummary | null> {
-    const row = await this.prisma.productVariant.findUnique({
-      where: { id },
-      include: { product: { select: { id: true, name: true, status: true } } },
+    return (await this.findVariants([id]))[0] ?? null;
+  }
+
+  async findVariants(ids: readonly string[]): Promise<VariantSummary[]> {
+    const rows = await this.prisma.productVariant.findMany({
+      where: { id: { in: [...ids] } },
+      include: { product: { select: { id: true, name: true, slug: true, status: true, images: true } } },
     });
-    if (!row) return null;
-    return {
+    return rows.map((row) => ({
       variantId: row.id,
       sku: row.sku,
       productId: row.product.id,
       productName: row.product.name,
       productStatus: row.product.status as ProductStatus,
-    };
+      productSlug: row.product.slug,
+      weightGrams: row.weightGrams,
+      options: row.options as Record<string, string>,
+      image: Array.isArray(row.product.images) && typeof row.product.images[0] === 'string' ? row.product.images[0] : null,
+    }));
   }
 
   async list(query: { limit: number; cursor?: string; status?: ProductStatus }): Promise<ProductSummary[]> {

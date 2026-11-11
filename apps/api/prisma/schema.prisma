@@ -335,8 +335,10 @@ model StockReservation {
   quantity    Int
   status      String    @default("held")
   expiresAt   DateTime  @db.Timestamptz
+  createdAt   DateTime  @default(now()) @db.Timestamptz
   stockItem   StockItem @relation(fields: [stockItemId], references: [id])
 
+  @@unique([checkoutId, stockItemId])
   @@index([status, expiresAt])
   @@index([checkoutId])
   @@map("stock_reservations")
@@ -364,8 +366,10 @@ model StockMovement {
 
 model Cart {
   id         String     @id @default(uuid()) @db.Uuid
+  /// Exactly one of customerId and guestToken is set (migration 0007). guestToken holds a SHA-256 hash.
   customerId String?    @db.Uuid
   guestToken String?    @unique
+  version    Int        @default(0)
   updatedAt  DateTime   @updatedAt @db.Timestamptz
   items      CartItem[]
 
@@ -374,11 +378,36 @@ model Cart {
   @@schema("cart")
 }
 
+model CheckoutSession {
+  id             String   @id @db.Uuid
+  customerId     String   @db.Uuid
+  idempotencyKey String
+  status         String   @default("awaiting_payment")
+  currency       String   @db.Char(3)
+  lines          Json
+  address        Json
+  subtotalMinor  BigInt
+  deliveryMinor  BigInt
+  totalMinor     BigInt
+  weightGrams    Int
+  expiresAt      DateTime @db.Timestamptz
+  version        Int      @default(0)
+  createdAt      DateTime @default(now()) @db.Timestamptz
+  updatedAt      DateTime @updatedAt @db.Timestamptz
+
+  @@unique([customerId, idempotencyKey])
+  @@index([customerId, status])
+  @@map("checkout_sessions")
+  @@schema("cart")
+}
+
 model CartItem {
   id        String @id @default(uuid()) @db.Uuid
   cartId    String @db.Uuid
   listingId String @db.Uuid
   quantity  Int
+  /// Display order, in the order lines were added.
+  position  Int    @default(0)
   cart      Cart   @relation(fields: [cartId], references: [id])
 
   @@unique([cartId, listingId])

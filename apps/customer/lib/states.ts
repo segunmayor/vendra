@@ -1,0 +1,9 @@
+/** Nigeria's 36 states and the FCT. The API checks the same list. */
+export const STATES = [
+  'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno', 'Cross River', 'Delta', 'Ebonyi', 'Edo',
+  'Ekiti', 'Enugu', 'FCT', 'Gombe', 'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Kogi', 'Kwara', 'Lagos', 'Nasarawa',
+  'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara',
+] as const;
+
+export type State = (typeof STATES)[number];
+export const isState = (value: string): value is State => (STATES as readonly string[]).includes(value);

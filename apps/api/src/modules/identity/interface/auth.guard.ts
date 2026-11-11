@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
-import { IS_PUBLIC, REQUIRED_PERMISSION, SURFACE } from '../../../platform/http/auth.decorators';
+import { GUEST_ALLOWED, IS_PUBLIC, REQUIRED_PERMISSION, SURFACE } from '../../../platform/http/auth.decorators';
 import { ApplicationError, Audience, Principal } from '../../../shared-kernel';
 import { AuthService } from '../application/auth.service';
 
@@ -22,6 +22,7 @@ export class AuthGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<Request & { principal?: Principal }>();
     const [scheme, token] = (request.headers.authorization ?? '').split(' ');
+    if (!request.headers.authorization && this.reflector.getAllAndOverride<boolean>(GUEST_ALLOWED, targets)) return true;
     if (scheme !== 'Bearer' || !token) {
       throw new ApplicationError('unauthenticated', 'auth.token_required', 'Authentication is required');
     }

@@ -15,6 +15,7 @@ export type { ListingState } from '../domain/listing';
 export interface ListingRepository {
   findById(id: string): Promise<Listing | null>;
   listByVariants(variantIds: readonly string[]): Promise<Listing[]>;
+  findByIds(ids: readonly string[]): Promise<Listing[]>;
   /** Must throw a `listing.exists` conflict if the seller already lists this variant. */
   save(listing: Listing, audit: AuditEntry): Promise<void>;
 }
@@ -134,6 +135,15 @@ export class ListingQueries {
       .map((listing) => listing.snapshot)
       .filter((state) => state.status === 'active')
       .map((state) => ({ listingId: state.id, variantId: state.variantId, sellerId: state.sellerId, price: state.price }));
+  }
+
+  /** Listings by id, with their current price and status. Unknown ids are left out. */
+  async getOffers(ids: readonly string[]): Promise<(ListingSummary & { price: Money })[]> {
+    if (ids.length === 0) return [];
+    return (await this.listings.findByIds(ids)).map((listing) => {
+      const { id, sellerId, variantId, status, price } = listing.snapshot;
+      return { id, sellerId, variantId, status, price };
+    });
   }
 
   async listingIdsOfProduct(productId: string): Promise<string[] | null> {

@@ -28,6 +28,14 @@ export class Money {
     return new Money(this.minor - other.minor, this.currency);
   }
 
+  /** Multiplies by a whole quantity, such as a line of 3 items. */
+  times(quantity: number): Money {
+    if (!Number.isSafeInteger(quantity) || quantity < 0) {
+      throw new DomainError('money.invalid_quantity', `Cannot multiply money by ${quantity}`);
+    }
+    return new Money(this.minor * BigInt(quantity), this.currency);
+  }
+
   isPositive(): boolean {
     return this.minor > 0n;
   }

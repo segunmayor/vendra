@@ -12,6 +12,7 @@ const NAVIGATION: readonly (NavItem & { permission?: string })[] = [
   { label: 'Categories', href: '/catalogue/categories', permission: 'catalogue.manage' },
   { label: 'Brands', href: '/catalogue/brands', permission: 'catalogue.manage' },
   { label: 'Warehouses', href: '/inventory/warehouses', permission: 'inventory.manage' },
+  { label: 'Delivery prices', href: '/settings/delivery', permission: 'settings.manage' },
 ];
 
 export default async function PortalLayout({ children }: { children: ReactNode }) {

@@ -26,7 +26,7 @@ Each step ends with tests passing before the next begins.
 | 2 | Identity: accounts, sessions, audiences, permissions, audit (API done 11 Nov) | 1 |
 | 3 | Portal sign-in (cookies), catalogue, listings, stock, admin screens (done 11 Nov) | 2 |
 | 4 | Discovery: storefront pages and search on PostgreSQL (done 11 Nov) | 3 |
-| 5 | Cart, checkout, stock reservation | 3 |
+| 5 | Cart, checkout, stock reservation (done 11 Nov) | 3 |
 | 6 | Payment: evaluate provider, build adapter, webhook, verification, ledger posting, staff MFA before refunds ship | 5, provider test keys |
 | 7 | Orders: created from verified payment | 6 |
 | 8 | Shipping: manual dispatch and customer tracking | 7 |

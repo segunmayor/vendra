@@ -3,6 +3,7 @@ import { formatMoney } from '@vendra/utils';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { AddToCart } from '../../../components/add-to-cart';
 import { AvailabilityBadge, Price, ProductImage } from '../../../components/catalogue';
 import { SiteHeader } from '../../../components/site-header';
 import { getProduct, type ProductDetail } from '../../../lib/catalogue';
@@ -126,6 +127,12 @@ export default async function ProductPage({ params, searchParams }: Props) {
                 </ul>
               </fieldset>
             ) : null}
+
+            <AddToCart
+              listingId={selected.offer.listingId}
+              max={selected.offer.lowStockQuantity ?? 10}
+              disabled={selected.offer.availability === 'out_of_stock'}
+            />
 
             <Card className="mt-6 text-sm">
               <p className="font-semibold">Pay securely, track your delivery</p>

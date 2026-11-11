@@ -5,3 +5,4 @@ export * from './principal';
 export * from './sellers';
 export * from './money';
 export * from './aggregate-root';
+export * from './geography';

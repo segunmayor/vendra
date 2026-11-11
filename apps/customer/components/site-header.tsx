@@ -1,10 +1,11 @@
 import { Wordmark } from '@vendra/ui';
 import Link from 'next/link';
+import { readCart } from '../lib/cart';
 import { listCategories } from '../lib/catalogue';
 import { session } from '../lib/session';
 
 export async function SiteHeader({ query }: { query?: string }) {
-  const [profile, categories] = await Promise.all([session.getProfile(), listCategories()]);
+  const [profile, categories, cart] = await Promise.all([session.getProfile(), listCategories(), readCart()]);
   const top = categories.filter((category) => category.parentId === null);
   return (
     <header className="border-b border-border bg-surface">
@@ -26,9 +27,19 @@ export async function SiteHeader({ query }: { query?: string }) {
             className="h-11 w-full rounded-full border border-border bg-background px-5 text-sm placeholder:text-muted focus-visible:outline-2 focus-visible:outline-primary"
           />
         </form>
-        <Link href={profile ? '/account' : '/login'} className="ml-auto text-sm font-semibold text-primary sm:ml-0">
-          {profile ? 'My account' : 'Sign in'}
-        </Link>
+        <div className="ml-auto flex items-center gap-4 sm:ml-0">
+          <Link href={profile ? '/account' : '/login'} className="text-sm font-semibold text-primary">
+            {profile ? 'My account' : 'Sign in'}
+          </Link>
+          <Link href="/cart" className="relative text-sm font-semibold text-primary" aria-label={`Basket, ${cart.itemCount} ${cart.itemCount === 1 ? 'item' : 'items'}`}>
+            Basket
+            {cart.itemCount > 0 ? (
+              <span aria-hidden="true" className="ml-1 inline-grid min-w-5 place-items-center rounded-full bg-accent px-1.5 text-xs font-bold text-accent-foreground">
+                {cart.itemCount}
+              </span>
+            ) : null}
+          </Link>
+        </div>
       </div>
       {top.length > 0 ? (
         <nav aria-label="Categories" className="mx-auto flex max-w-6xl gap-5 overflow-x-auto px-4 pb-3 text-sm">

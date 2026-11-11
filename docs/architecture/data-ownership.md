@@ -1,6 +1,6 @@
 # Data ownership
 
-- **One PostgreSQL database, one schema per module group** (`identity`, `customers`, `sellers`, `catalogue`, `inventory`, `cart`, `orders`, `payments`, `ledger`, `shipping`, `platform`).
+- **One PostgreSQL database, one schema per module group** (`identity`, `customers`, `sellers`, `catalogue`, `inventory`, `cart`, `orders`, `payments`, `ledger`, `shipping`, `platform`). `cart` holds both carts and checkout sessions; `shipping` holds the delivery zones and rates owned by `logistics`.
 - **No foreign keys between schemas.** A cross-context reference is a plain UUID column. Foreign keys exist only inside a schema. Consistency across contexts comes from application contracts and events, so a module's schema can be moved out later.
 - **Only the owning module's repositories touch its tables.** Prisma is restricted to `infrastructure/`, and the architecture test enforces this.
 - **Single Prisma schema and migration history** at `apps/api/prisma`, because the monolith deploys as one unit. Models are grouped by Postgres schema.

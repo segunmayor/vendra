@@ -695,6 +695,185 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/store/cart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["storeGetCart"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store/cart/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["storeAddCartItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store/cart/items/{listingId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["storeSetCartItem"];
+        post?: never;
+        delete: operations["storeRemoveCartItem"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store/cart/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["storeMergeCart"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/delivery-zones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminListDeliveryZones"];
+        put?: never;
+        post: operations["adminCreateDeliveryZone"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/delivery-zones/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["adminUpdateDeliveryZone"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store/checkout/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Delivery fee for the basket to a state. Reserves nothing. */
+        post: operations["storeQuoteDelivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Prices the basket and holds its stock for payment */
+        post: operations["storeStartCheckout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store/checkout/last-address": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["storeLastCheckoutAddress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store/checkout/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["storeGetCheckout"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store/checkout/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancels the checkout and returns its stock to sale */
+        post: operations["storeCancelCheckout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -997,6 +1176,114 @@ export interface components {
             /** @enum {string} */
             availability: "in_stock" | "low_stock" | "out_of_stock";
             variants: components["schemas"]["StoreVariantDto"][];
+        };
+        CartLineResponse: {
+            listingId: string;
+            productName: string;
+            productSlug?: string | null;
+            sku?: string | null;
+            options: {
+                [key: string]: string;
+            };
+            image?: string | null;
+            quantity: number;
+            unitPrice?: components["schemas"]["MoneyDto"] | null;
+            lineTotal?: components["schemas"]["MoneyDto"] | null;
+            /** @enum {string|null} */
+            issue?: "unavailable" | "out_of_stock" | "insufficient_stock" | null;
+            availableQuantity?: number | null;
+        };
+        CartResponse: {
+            lines: components["schemas"]["CartLineResponse"][];
+            itemCount: number;
+            /** @description Total of the lines that can be bought now */
+            subtotal: components["schemas"]["MoneyDto"];
+            /** @description False if the cart is empty or any line has an issue */
+            canCheckout: boolean;
+            /** @description Returned once, when a guest cart is created. Send it back as X-Cart-Token. */
+            guestToken?: string;
+            /** @description On merge: true if some quantities were reduced to the per-order limit */
+            capped?: boolean;
+        };
+        AddItemDto: {
+            listingId: string;
+            quantity: number;
+        };
+        SetQuantityDto: {
+            /** @description 0 removes the line */
+            quantity: number;
+        };
+        RateDto: {
+            maxWeightGrams: number;
+            /**
+             * @description Kobo, as a string
+             * @example 250000
+             */
+            priceMinor: string;
+        };
+        DeliveryZoneResponse: {
+            code: string;
+            name: string;
+            states: ("Abia" | "Adamawa" | "Akwa Ibom" | "Anambra" | "Bauchi" | "Bayelsa" | "Benue" | "Borno" | "Cross River" | "Delta" | "Ebonyi" | "Edo" | "Ekiti" | "Enugu" | "FCT" | "Gombe" | "Imo" | "Jigawa" | "Kaduna" | "Kano" | "Katsina" | "Kebbi" | "Kogi" | "Kwara" | "Lagos" | "Nasarawa" | "Niger" | "Ogun" | "Ondo" | "Osun" | "Oyo" | "Plateau" | "Rivers" | "Sokoto" | "Taraba" | "Yobe" | "Zamfara")[];
+            rates: components["schemas"]["RateDto"][];
+            id: string;
+        };
+        DeliveryZoneDto: {
+            code: string;
+            name: string;
+            states: ("Abia" | "Adamawa" | "Akwa Ibom" | "Anambra" | "Bauchi" | "Bayelsa" | "Benue" | "Borno" | "Cross River" | "Delta" | "Ebonyi" | "Edo" | "Ekiti" | "Enugu" | "FCT" | "Gombe" | "Imo" | "Jigawa" | "Kaduna" | "Kano" | "Katsina" | "Kebbi" | "Kogi" | "Kwara" | "Lagos" | "Nasarawa" | "Niger" | "Ogun" | "Ondo" | "Osun" | "Oyo" | "Plateau" | "Rivers" | "Sokoto" | "Taraba" | "Yobe" | "Zamfara")[];
+            rates: components["schemas"]["RateDto"][];
+        };
+        QuoteDto: {
+            /** @enum {string} */
+            state: "Abia" | "Adamawa" | "Akwa Ibom" | "Anambra" | "Bauchi" | "Bayelsa" | "Benue" | "Borno" | "Cross River" | "Delta" | "Ebonyi" | "Edo" | "Ekiti" | "Enugu" | "FCT" | "Gombe" | "Imo" | "Jigawa" | "Kaduna" | "Kano" | "Katsina" | "Kebbi" | "Kogi" | "Kwara" | "Lagos" | "Nasarawa" | "Niger" | "Ogun" | "Ondo" | "Osun" | "Oyo" | "Plateau" | "Rivers" | "Sokoto" | "Taraba" | "Yobe" | "Zamfara";
+        };
+        DeliveryQuoteResponse: {
+            subtotal: components["schemas"]["MoneyDto"];
+            delivery?: components["schemas"]["MoneyDto"] | null;
+            total?: components["schemas"]["MoneyDto"] | null;
+            /** @description Why delivery cannot be quoted */
+            problem?: string | null;
+        };
+        StartCheckoutDto: {
+            address: components["schemas"]["AddressDto"];
+        };
+        CheckoutLineDto: {
+            listingId: string;
+            sku: string;
+            productName: string;
+            options: {
+                [key: string]: string;
+            };
+            quantity: number;
+            unitPrice: components["schemas"]["MoneyDto"];
+            lineTotal: components["schemas"]["MoneyDto"];
+        };
+        SavedAddressResponse: {
+            recipient: string;
+            phone: string;
+            line1: string;
+            line2?: string | null;
+            city: string;
+            state: string;
+        };
+        CheckoutResponse: {
+            id: string;
+            /** @enum {string} */
+            status: "awaiting_payment" | "cancelled" | "expired" | "paid";
+            lines: components["schemas"]["CheckoutLineDto"][];
+            address: components["schemas"]["SavedAddressResponse"];
+            subtotal: components["schemas"]["MoneyDto"];
+            delivery: components["schemas"]["MoneyDto"];
+            total: components["schemas"]["MoneyDto"];
+            /**
+             * Format: date-time
+             * @description Stock is held until this time
+             */
+            expiresAt: string;
+        };
+        LastAddressResponse: {
+            address?: components["schemas"]["SavedAddressResponse"] | null;
         };
     };
     responses: never;
@@ -2117,6 +2404,305 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProductDetailResponse"];
+                };
+            };
+        };
+    };
+    storeGetCart: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Guest cart token, when not signed in */
+                "X-Cart-Token"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartResponse"];
+                };
+            };
+        };
+    };
+    storeAddCartItem: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Guest cart token, when not signed in */
+                "X-Cart-Token"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddItemDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartResponse"];
+                };
+            };
+        };
+    };
+    storeSetCartItem: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Guest cart token, when not signed in */
+                "X-Cart-Token"?: string;
+            };
+            path: {
+                listingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetQuantityDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartResponse"];
+                };
+            };
+        };
+    };
+    storeRemoveCartItem: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Guest cart token, when not signed in */
+                "X-Cart-Token"?: string;
+            };
+            path: {
+                listingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartResponse"];
+                };
+            };
+        };
+    };
+    storeMergeCart: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Guest cart token, when not signed in */
+                "X-Cart-Token"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartResponse"];
+                };
+            };
+        };
+    };
+    adminListDeliveryZones: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryZoneResponse"][];
+                };
+            };
+        };
+    };
+    adminCreateDeliveryZone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeliveryZoneDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryZoneResponse"];
+                };
+            };
+        };
+    };
+    adminUpdateDeliveryZone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeliveryZoneDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryZoneResponse"];
+                };
+            };
+        };
+    };
+    storeQuoteDelivery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuoteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryQuoteResponse"];
+                };
+            };
+        };
+    };
+    storeStartCheckout: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description One key per checkout attempt, reused on retry */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartCheckoutDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutResponse"];
+                };
+            };
+        };
+    };
+    storeLastCheckoutAddress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LastAddressResponse"];
+                };
+            };
+        };
+    };
+    storeGetCheckout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutResponse"];
+                };
+            };
+        };
+    };
+    storeCancelCheckout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutResponse"];
                 };
             };
         };

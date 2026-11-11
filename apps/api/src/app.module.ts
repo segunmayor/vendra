@@ -3,14 +3,17 @@ import { APP_FILTER } from '@nestjs/core';
 import { HealthController } from './platform/health/health.controller';
 import { ProblemDetailsFilter } from './platform/http/problem-details.filter';
 import { PlatformModule } from './platform/platform.module';
+import { CartModule } from './modules/cart/cart.module';
 import { CatalogueModule } from './modules/catalogue/catalogue.module';
+import { CheckoutModule } from './modules/checkout/checkout.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { ListingsModule } from './modules/listings/listings.module';
+import { LogisticsModule } from './modules/logistics/logistics.module';
 import { StorefrontModule } from './modules/storefront/storefront.module';
 
 @Module({
-  imports: [PlatformModule, IdentityModule, CatalogueModule, ListingsModule, InventoryModule, StorefrontModule],
+  imports: [PlatformModule, IdentityModule, CatalogueModule, ListingsModule, InventoryModule, StorefrontModule, CartModule, LogisticsModule, CheckoutModule],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: ProblemDetailsFilter }],
 })

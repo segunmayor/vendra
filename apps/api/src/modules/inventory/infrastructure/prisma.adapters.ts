@@ -50,15 +50,23 @@ export class PrismaStockRepository implements StockRepository {
     return row?.stockItem ?? null;
   }
 
+  /**
+   * Holds past their expiry count as free here, even before the sweep or the next
+   * reservation releases them, so customers never see stock that is no longer held as gone.
+   */
   async listByListings(listingIds: readonly string[]): Promise<StockView[]> {
-    const rows = await this.prisma.stockItem.findMany({ where: { listingId: { in: [...listingIds] } } });
-    return rows.map((row) => ({
-      listingId: row.listingId,
-      warehouseId: row.warehouseId,
-      onHand: row.onHand,
-      reserved: row.reserved,
-      available: row.onHand - row.reserved,
-    }));
+    if (listingIds.length === 0) return [];
+    const rows = await this.prisma.$queryRaw<{ listingId: string; warehouseId: string; onHand: number; reserved: number; lapsed: number }[]>`
+      SELECT s."listingId", s."warehouseId", s."onHand", s."reserved",
+             COALESCE(SUM(r."quantity") FILTER (WHERE r."status" = 'held' AND r."expiresAt" <= now()), 0)::int AS "lapsed"
+      FROM "inventory"."stock_items" s
+      LEFT JOIN "inventory"."stock_reservations" r ON r."stockItemId" = s."id"
+      WHERE s."listingId" = ANY(${[...listingIds]}::uuid[])
+      GROUP BY s."id"`;
+    return rows.map((row) => {
+      const reserved = row.reserved - row.lapsed;
+      return { listingId: row.listingId, warehouseId: row.warehouseId, onHand: row.onHand, reserved, available: row.onHand - reserved };
+    });
   }
 
   async save(item: StockItem, movement: Movement, audit: AuditEntry): Promise<void> {
