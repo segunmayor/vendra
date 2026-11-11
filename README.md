@@ -17,6 +17,12 @@ pnpm --filter @vendra/api exec prisma migrate deploy
 pnpm dev
 ```
 
+Create the first administrator once, after building the API:
+
+```bash
+ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a-long-password' pnpm --filter @vendra/api admin:create
+```
+
 ## Checks
 
 ```bash

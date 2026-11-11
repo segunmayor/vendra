@@ -23,11 +23,11 @@ Each step ends with tests passing before the next begins.
 | # | Step | Depends on |
 | --- | --- | --- |
 | 1 | Persistence: apply migration, outbox, Prisma repositories (done 11 Nov) | Development database |
-| 2 | Identity: accounts, sessions, audiences, permissions, audit | 1 |
-| 3 | Catalogue, listings, stock, admin screens | 2 |
+| 2 | Identity: accounts, sessions, audiences, permissions, audit (API done 11 Nov) | 1 |
+| 3 | Portal sign-in (cookies), catalogue, listings, stock, admin screens | 2 |
 | 4 | Discovery: storefront pages and search | 3, Meilisearch |
 | 5 | Cart, checkout, stock reservation | 3 |
-| 6 | Payment: evaluate provider, build adapter, webhook, verification, ledger posting | 5, provider test keys |
+| 6 | Payment: evaluate provider, build adapter, webhook, verification, ledger posting, staff MFA before refunds ship | 5, provider test keys |
 | 7 | Orders: created from verified payment | 6 |
 | 8 | Shipping: manual dispatch and customer tracking | 7 |
 | 9 | Vendor registration and verification | 2 |

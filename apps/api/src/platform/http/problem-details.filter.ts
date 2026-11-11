@@ -1,6 +1,14 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { ConcurrencyConflict, DomainError } from '../../shared-kernel';
+import { ApplicationError, ApplicationErrorKind, ConcurrencyConflict, DomainError } from '../../shared-kernel';
+
+const STATUS_BY_KIND: Record<ApplicationErrorKind, number> = {
+  unauthenticated: HttpStatus.UNAUTHORIZED,
+  forbidden: HttpStatus.FORBIDDEN,
+  not_found: HttpStatus.NOT_FOUND,
+  conflict: HttpStatus.CONFLICT,
+  rate_limited: HttpStatus.TOO_MANY_REQUESTS,
+};
 
 /** Renders every error as RFC 9457. Unexpected errors never leak details to clients. */
 @Catch()
@@ -18,6 +26,10 @@ export class ProblemDetailsFilter implements ExceptionFilter {
 
     if (exception instanceof DomainError) {
       status = HttpStatus.UNPROCESSABLE_ENTITY;
+      code = exception.code;
+      detail = exception.message;
+    } else if (exception instanceof ApplicationError) {
+      status = STATUS_BY_KIND[exception.kind];
       code = exception.code;
       detail = exception.message;
     } else if (exception instanceof ConcurrencyConflict) {
