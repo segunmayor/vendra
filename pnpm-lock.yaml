@@ -23,6 +23,9 @@ importers:
       '@vendra/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@vendra/portal-session':
+        specifier: workspace:*
+        version: link:../../packages/portal-session
       '@vendra/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -44,6 +47,9 @@ importers:
       react-hook-form:
         specifier: ^7.91.0
         version: 7.91.0(@types/react@19.3.0)(react@19.3.1)
+      server-only:
+        specifier: ^0.0.1
+        version: 0.0.1
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.3.5
@@ -136,6 +142,9 @@ importers:
       '@vendra/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@vendra/portal-session':
+        specifier: workspace:*
+        version: link:../../packages/portal-session
       '@vendra/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -157,6 +166,9 @@ importers:
       react-hook-form:
         specifier: ^7.91.0
         version: 7.91.0(@types/react@19.3.0)(react@19.3.1)
+      server-only:
+        specifier: ^0.0.1
+        version: 0.0.1
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.3.5
@@ -188,6 +200,9 @@ importers:
       '@vendra/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@vendra/portal-session':
+        specifier: workspace:*
+        version: link:../../packages/portal-session
       '@vendra/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -209,6 +224,9 @@ importers:
       react-hook-form:
         specifier: ^7.91.0
         version: 7.91.0(@types/react@19.3.0)(react@19.3.1)
+      server-only:
+        specifier: ^0.0.1
+        version: 0.0.1
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.3.5
@@ -266,6 +284,37 @@ importers:
 
   packages/config: {}
 
+  packages/portal-session:
+    dependencies:
+      '@vendra/api-client':
+        specifier: workspace:*
+        version: link:../api-client
+      server-only:
+        specifier: ^0.0.1
+        version: 0.0.1
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.5
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.3.0
+      '@vendra/config':
+        specifier: workspace:*
+        version: link:../config
+      next:
+        specifier: ^16.4.6
+        version: 16.4.6(@types/node@22.20.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      react:
+        specifier: ^19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: ^19.3.1
+        version: 19.3.1(react@19.3.1)
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+
   packages/ui:
     dependencies:
       class-variance-authority:
@@ -281,12 +330,18 @@ importers:
       '@types/react':
         specifier: ^19.0.0
         version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.3.0(@types/react@19.3.0)
       '@vendra/config':
         specifier: workspace:*
         version: link:../config
       react:
         specifier: ^19.3.1
         version: 19.3.1
+      react-dom:
+        specifier: ^19.3.1
+        version: 19.3.1(react@19.3.1)
       tailwindcss:
         specifier: ^4.3.5
         version: 4.3.5
@@ -2872,6 +2927,9 @@ packages:
   serve-static@2.2.1:
     resolution: {integrity: sha512-xRXBn0pPqQTVQiC8wyQrKs2MOlX24zQ0POGaj0kultvoOCstBQM5yvOhAVSUwOMjQtTvsPWoNCHfPGwaaQJhTw==}
     engines: {node: '>= 18'}
+
+  server-only@0.0.1:
+    resolution: {integrity: sha512-qepMx2JxAa5jjfzxG79yPPq+8BuFToHd1hm7kI+Z4zAq1ftQiP7HcxMhDDItrbtwVeLg/cY2JnKnrcFkmiswNA==}
 
   setprototypeof@1.2.0:
     resolution: {integrity: sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw==}
@@ -5765,6 +5823,8 @@ snapshots:
       send: 1.2.1
     transitivePeerDependencies:
       - supports-color
+
+  server-only@0.0.1: {}
 
   setprototypeof@1.2.0: {}
 

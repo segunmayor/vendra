@@ -1,0 +1,28 @@
+{
+  "name": "@vendra/portal-session",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./proxy": "./src/proxy.ts",
+    "./server": "./src/server.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test src/*.test.ts"
+  },
+  "dependencies": {
+    "@vendra/api-client": "workspace:*",
+    "server-only": "^0.0.1"
+  },
+  "peerDependencies": { "next": "^16.0.0" },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@vendra/config": "workspace:*",
+    "next": "^16.4.6",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "~5.9.3"
+  }
+}

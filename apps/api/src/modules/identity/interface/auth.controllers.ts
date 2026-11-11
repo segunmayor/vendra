@@ -1,7 +1,9 @@
-import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Post, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
+import { ENV, Env } from '../../../platform/config/env';
 import { CurrentPrincipal, Public, Surface } from '../../../platform/http/auth.decorators';
+import { clientIp } from '../../../platform/http/request';
 import { ZodPipe } from '../../../platform/http/zod.pipe';
 import { Audience, Principal } from '../../../shared-kernel';
 import { AccountProfile, AuthService, IssuedSession } from '../application/auth.service';
@@ -22,7 +24,10 @@ function createAuthController(audience: Audience) {
   @Surface(audience)
   @Controller({ path: `${audience}/auth`, version: '1' })
   class AuthController {
-    constructor(readonly auth: AuthService) {}
+    constructor(
+      readonly auth: AuthService,
+      @Inject(ENV) readonly env: Env,
+    ) {}
 
     @Public()
     @Post('login')
@@ -33,7 +38,7 @@ function createAuthController(audience: Audience) {
       @Body(new ZodPipe(credentialsSchema)) body: CredentialsDto,
       @Req() request: Request,
     ): Promise<IssuedSession> {
-      return this.auth.login(audience, body.email, body.password, request.ip ?? 'unknown');
+      return this.auth.login(audience, body.email, body.password, clientIp(request, this.env.PORTAL_SHARED_SECRET));
     }
 
     @Public()

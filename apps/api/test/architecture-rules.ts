@@ -65,7 +65,10 @@ function check(from: Location, target: Location | null): string | null {
   if (from.layer === 'domain' || from.layer === 'public') {
     return `${from.layer} must not import other modules`;
   }
-  return target.layer === 'public' ? null : `other module internals (${target.module}/${target.layer})`;
+  if (target.layer === 'public') return null;
+  // NestJS needs a module's composition file to import another's to use its contract.
+  if (from.layer === 'composition' && target.layer === 'composition') return null;
+  return `other module internals (${target.module}/${target.layer})`;
 }
 
 export function findViolations(files: readonly SourceFile[]): string[] {

@@ -5,6 +5,8 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32),
+  /** Shared with the portals so they can pass on the visitor's IP address. */
+  PORTAL_SHARED_SECRET: z.string().min(32).optional(),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).default(0),
   CORS_ORIGINS: z
     .string()

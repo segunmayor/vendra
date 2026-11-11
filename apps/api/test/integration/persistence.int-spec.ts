@@ -36,7 +36,7 @@ const eventTypes = async (aggregateId: string) =>
 
 beforeAll(async () => {
   const [row] = await prisma.$queryRaw<{ db: string }[]>`SELECT current_database() AS db`;
-  if (!row || !/(dev|test)/.test(row.db)) throw new Error(`Refusing to run against database: ${row?.db}`);
+  if (!row || !/test/.test(row.db)) throw new Error(`Refusing to run against database: ${row?.db}`);
 });
 
 afterAll(() => prisma.$disconnect());

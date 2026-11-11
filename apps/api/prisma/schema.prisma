@@ -252,6 +252,7 @@ model Product {
   attributes  Json             @default("{}")
   images      Json             @default("[]")
   status      String           @default("draft")
+  version     Int              @default(0)
   createdAt   DateTime         @default(now()) @db.Timestamptz
   updatedAt   DateTime         @updatedAt @db.Timestamptz
   category    Category         @relation(fields: [categoryId], references: [id])
@@ -347,6 +348,8 @@ model StockMovement {
   createdAt   DateTime  @default(now()) @db.Timestamptz
   stockItem   StockItem @relation(fields: [stockItemId], references: [id])
 
+  @@unique([stockItemId, sourceType, sourceId])
+  @@index([sourceType, sourceId])
   @@index([stockItemId, createdAt])
   @@map("stock_movements")
   @@schema("inventory")

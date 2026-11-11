@@ -9,3 +9,11 @@ export function formatMoney(amountMinor: string, currency: string): string {
   const symbol = SYMBOLS[currency] ?? `${currency} `;
   return `${negative ? '-' : ''}${symbol}${whole}.${digits.slice(-2)}`;
 }
+
+/** Converts a naira amount typed by a person, such as "15,000.50", into exact kobo. Returns null if it is not a valid amount. */
+export function nairaToKobo(input: string): string | null {
+  const cleaned = input.trim().replace(/^₦/, '').replace(/,(?=\d{3}(?:\D|$))/g, '');
+  const match = /^(\d{1,13})(?:\.(\d{1,2}))?$/.exec(cleaned);
+  if (!match) return null;
+  return `${match[1]}${(match[2] ?? '').padEnd(2, '0')}`.replace(/^0+(?=\d)/, '');
+}

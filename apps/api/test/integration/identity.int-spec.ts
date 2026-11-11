@@ -63,7 +63,7 @@ async function makeStaff(permissions: readonly string[]) {
 
 beforeAll(async () => {
   const [row] = await prisma.$queryRaw<{ db: string }[]>`SELECT current_database() AS db`;
-  if (!row || !/(dev|test)/.test(row.db)) throw new Error(`Refusing to run against database: ${row?.db}`);
+  if (!row || !/test/.test(row.db)) throw new Error(`Refusing to run against database: ${row?.db}`);
   app = await createApp();
   await app.listen(0, '127.0.0.1');
   base = `http://127.0.0.1:${(app.getHttpServer().address() as AddressInfo).port}`;

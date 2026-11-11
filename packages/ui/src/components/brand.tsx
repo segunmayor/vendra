@@ -23,29 +23,54 @@ export function EmptyState({ title, children }: { title: string; children: React
   );
 }
 
-/** Sidebar layout shared by the admin and vendor portals. */
+export interface NavItem {
+  readonly label: string;
+  readonly href: string;
+}
+
+/**
+ * Sidebar layout shared by the admin and vendor portals. `renderLink` lets each portal
+ * supply its router's link component, so this package stays framework free.
+ */
 export function PortalShell({
   brand,
   navigation,
+  currentPath,
+  renderLink,
+  account,
   children,
 }: {
   brand: ReactNode;
-  navigation: readonly string[];
+  navigation: readonly NavItem[];
+  currentPath?: string;
+  renderLink?: (item: NavItem, props: { className: string; 'aria-current'?: 'page' }) => ReactNode;
+  account?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="min-h-screen md:grid md:grid-cols-[15rem_1fr]">
-      <aside className="border-b border-border bg-surface p-4 md:border-r md:border-b-0">
+      <aside className="flex flex-col border-b border-border bg-surface p-4 md:sticky md:top-0 md:h-screen md:border-r md:border-b-0">
         {brand}
         <nav aria-label="Main" className="mt-4 flex gap-1 overflow-x-auto md:mt-6 md:flex-col">
-          {navigation.map((item) => (
-            <span key={item} className="rounded-brand px-3 py-2 text-sm whitespace-nowrap text-muted">
-              {item}
-            </span>
-          ))}
+          {navigation.map((item) => {
+            const current =
+              currentPath !== undefined &&
+              (item.href === '/' ? currentPath === '/' : currentPath === item.href || currentPath.startsWith(`${item.href}/`));
+            const className = cn(
+              'rounded-brand px-3 py-2 text-sm whitespace-nowrap',
+              current ? 'bg-background font-semibold text-primary' : 'text-muted hover:text-foreground',
+            );
+            const props = { className, ...(current ? { 'aria-current': 'page' as const } : {}) };
+            return (
+              <span key={item.href} className="contents">
+                {renderLink ? renderLink(item, props) : <a href={item.href} {...props}>{item.label}</a>}
+              </span>
+            );
+          })}
         </nav>
+        {account ? <div className="mt-4 border-t border-border pt-4 md:mt-auto">{account}</div> : null}
       </aside>
-      <main className="p-4 md:p-8">{children}</main>
+      <main className="min-w-0 p-4 md:p-8">{children}</main>
     </div>
   );
 }

@@ -64,4 +64,4 @@ Enforcement: a global guard refuses any route that is neither marked `Public` no
 
 Login failures are limited to 5 per account and 100 per IP address in 15 minutes. Session lifetimes are absolute: 30 days for customers, 14 for vendors, 12 hours for staff.
 
-Status: decisions 1, 3, 4, 5, 8 and 9 are built in the API. Still to build: portal cookie handling (2), staff MFA (6), and vendor tenancy (7).
+Status: decisions 1, 2, 3, 4, 5, 8 and 9 are built. Decision 2 is described in [portal-sessions.md](portal-sessions.md). Still to build: staff MFA (6) and vendor tenancy (7).

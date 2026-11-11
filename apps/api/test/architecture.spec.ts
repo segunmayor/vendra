@@ -49,6 +49,7 @@ describe('architecture rules', () => {
     ['another module repository', 'modules/orders/infrastructure/a.ts', '../../payments/infrastructure/repo'],
     ['domain using another module', 'modules/orders/domain/a.ts', '../../payments'],
     ['controller using infrastructure', 'modules/orders/interface/a.ts', '../infrastructure/repo'],
+    ['a controller importing another module composition', 'modules/orders/interface/a.ts', '../../payments/payments.module'],
     ['controller using Prisma', 'modules/orders/interface/a.ts', '@prisma/client'],
     ['shared kernel importing a module', 'shared-kernel/a.ts', '../modules/payments'],
     ['platform importing a module', 'platform/a.ts', '../modules/payments'],
@@ -61,6 +62,7 @@ describe('architecture rules', () => {
     ['the shared kernel', 'modules/payments/domain/a.ts', '../../../shared-kernel'],
     ['an adapter using an SDK', 'modules/payments/infrastructure/a.ts', 'some-provider-sdk'],
     ['an adapter using a port', 'modules/payments/infrastructure/a.ts', '../application/ports'],
+    ['a composition file importing another', 'modules/orders/orders.module.ts', '../payments/payments.module'],
   ])('allows %s', (_name, file, specifier) => {
     expect(findViolations([{ path: file, imports: [specifier] }])).toEqual([]);
   });

@@ -29,6 +29,7 @@ Dependencies point inward: `interface`/`infrastructure` → `application` → `d
 | `infrastructure` | Own inner layers, `shared-kernel`, `platform`, npm packages, another module's `index.ts` | Another module's internals |
 | `interface` | Own `application` and `interface`, `shared-kernel`, `platform`, npm packages | Own `infrastructure`, another module's internals |
 | `index.ts` | Own `application` | Anything else |
+| `<name>.module.ts` | Anything in its own module, `platform`, another module's `index.ts` or `<name>.module.ts` | Another module's internals |
 | `platform` | `platform`, `shared-kernel`, npm packages | Any module |
 
 These rules are executable. `apps/api/test/architecture.spec.ts` parses every import and fails the build on a violation. It uses the TypeScript compiler already in the project, so it adds no tool.

@@ -5,6 +5,7 @@ Vendra is a Nigerian multi-category retail and marketplace platform owned by Dat
 | Document | Covers |
 | --- | --- |
 | [System overview](architecture/system-overview.md) | Portals, central API, API conventions, authentication and authorization |
+| [Portal sessions](architecture/portal-sessions.md) | How the portals sign people in, hold tokens and refresh them |
 | [Backend conventions](architecture/backend-conventions.md) | DDD, Hexagonal Architecture, modular monolith, dependency rules |
 | [Bounded contexts](architecture/bounded-contexts.md) | Module ownership of aggregates and operations |
 | [Data ownership](architecture/data-ownership.md) | Database strategy, money, migrations |

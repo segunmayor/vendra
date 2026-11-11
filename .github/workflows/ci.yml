@@ -39,6 +39,7 @@ jobs:
           --health-cmd "pg_isready -U vendra" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       JWT_SECRET: ci-only-secret-with-at-least-32-characters
+      PORTAL_SHARED_SECRET: ci-only-portal-secret-with-at-least-32-characters
       DATABASE_URL: postgresql://vendra:vendra_ci@localhost:5432/vendra_test
       DIRECT_DATABASE_URL: postgresql://vendra:vendra_ci@localhost:5432/vendra_test
     steps:
