@@ -106,6 +106,13 @@ export class ListingService {
   }
 }
 
+export interface ActiveOffer {
+  readonly listingId: string;
+  readonly variantId: string;
+  readonly sellerId: string;
+  readonly price: Money;
+}
+
 /** What other modules may ask about listings. */
 export class ListingQueries {
   constructor(
@@ -118,6 +125,15 @@ export class ListingQueries {
     if (!listing) return null;
     const { sellerId, variantId, status } = listing.snapshot;
     return { id, sellerId, variantId, status };
+  }
+
+  /** Active offers for these variants: what a customer can buy, and at what price. */
+  async activeOffers(variantIds: readonly string[]): Promise<ActiveOffer[]> {
+    if (variantIds.length === 0) return [];
+    return (await this.listings.listByVariants(variantIds))
+      .map((listing) => listing.snapshot)
+      .filter((state) => state.status === 'active')
+      .map((state) => ({ listingId: state.id, variantId: state.variantId, sellerId: state.sellerId, price: state.price }));
   }
 
   async listingIdsOfProduct(productId: string): Promise<string[] | null> {

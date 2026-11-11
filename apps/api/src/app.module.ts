@@ -7,9 +7,10 @@ import { CatalogueModule } from './modules/catalogue/catalogue.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { ListingsModule } from './modules/listings/listings.module';
+import { StorefrontModule } from './modules/storefront/storefront.module';
 
 @Module({
-  imports: [PlatformModule, IdentityModule, CatalogueModule, ListingsModule, InventoryModule],
+  imports: [PlatformModule, IdentityModule, CatalogueModule, ListingsModule, InventoryModule, StorefrontModule],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: ProblemDetailsFilter }],
 })

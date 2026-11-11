@@ -646,6 +646,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/store/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["storeListCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Browse newest first, or search by relevance with ?q= */
+        get: operations["storeListProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store/products/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["storeGetProduct"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -874,6 +923,80 @@ export interface components {
             delta: number;
             /** @enum {string} */
             reason: "receipt" | "correction" | "damaged" | "lost" | "returned";
+        };
+        StoreCategoryResponse: {
+            id: string;
+            name: string;
+            slug: string;
+            parentId?: string | null;
+            productCount: number;
+        };
+        RefDto: {
+            id: string;
+            name: string;
+            slug: string;
+        };
+        MoneyDto: {
+            /**
+             * @description Integer minor units (kobo), as a string
+             * @example 1500000
+             */
+            amountMinor: string;
+            /** @example NGN */
+            currency: string;
+        };
+        ProductCardResponse: {
+            id: string;
+            slug: string;
+            name: string;
+            brand?: components["schemas"]["RefDto"] | null;
+            category: components["schemas"]["RefDto"];
+            image?: string | null;
+            priceFrom: components["schemas"]["MoneyDto"];
+            priceTo: components["schemas"]["MoneyDto"];
+            /** @enum {string} */
+            availability: "in_stock" | "low_stock" | "out_of_stock";
+        };
+        ProductPageResponse: {
+            items: components["schemas"]["ProductCardResponse"][];
+            /** @description Pass as ?cursor= for the next page */
+            nextCursor?: string | null;
+        };
+        AttributeDto: {
+            label: string;
+            value: string;
+        };
+        OfferDto: {
+            listingId: string;
+            price: components["schemas"]["MoneyDto"];
+            /** @enum {string} */
+            availability: "in_stock" | "low_stock" | "out_of_stock";
+            /** @description Set only when stock is low */
+            lowStockQuantity?: number | null;
+        };
+        StoreVariantDto: {
+            id: string;
+            sku: string;
+            options: {
+                [key: string]: string;
+            };
+            offer: components["schemas"]["OfferDto"];
+        };
+        ProductDetailResponse: {
+            id: string;
+            slug: string;
+            name: string;
+            description: string;
+            brand?: components["schemas"]["RefDto"] | null;
+            category: components["schemas"]["RefDto"];
+            breadcrumb: components["schemas"]["RefDto"][];
+            images: string[];
+            attributes: components["schemas"]["AttributeDto"][];
+            priceFrom: components["schemas"]["MoneyDto"];
+            priceTo: components["schemas"]["MoneyDto"];
+            /** @enum {string} */
+            availability: "in_stock" | "low_stock" | "out_of_stock";
+            variants: components["schemas"]["StoreVariantDto"][];
         };
     };
     responses: never;
@@ -1927,6 +2050,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockResponse"];
+                };
+            };
+        };
+    };
+    storeListCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoreCategoryResponse"][];
+                };
+            };
+        };
+    };
+    storeListProducts: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+                /** @description Brand slug */
+                brand?: string;
+                /** @description Category slug; includes subcategories */
+                category?: string;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductPageResponse"];
+                };
+            };
+        };
+    };
+    storeGetProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductDetailResponse"];
                 };
             };
         };

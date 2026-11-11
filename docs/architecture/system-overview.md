@@ -13,7 +13,7 @@
 ```
 customer ─┐
 admin ────┼── HTTPS, versioned REST ──► api ──► PostgreSQL
-vendor ───┘                              │  └─► Meilisearch, R2/S3
+vendor ───┘                              │  └─► R2/S3 (product images, not yet chosen)
                                          └─► Redis ◄── worker
 ```
 

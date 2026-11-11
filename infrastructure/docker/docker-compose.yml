@@ -11,13 +11,6 @@ services:
   redis:
     image: redis:7.4-alpine
     ports: ["127.0.0.1:56379:6379"]
-  meilisearch:
-    image: getmeili/meilisearch:v1.16
-    environment:
-      MEILI_MASTER_KEY: vendra_local_master_key_for_development
-    ports: ["127.0.0.1:57700:7700"]
-    volumes: ["meili_data:/meili_data"]
 
 volumes:
   postgres_data:
-  meili_data:

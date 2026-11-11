@@ -9,7 +9,7 @@ Each aggregate has exactly one owner. Other modules hold its ID and call the own
 | `identity` | Account, Session, Role, Permission | Register, authenticate, authorize | Full |
 | `customers` | CustomerProfile, Address | Manage profile and address book | Full |
 | `vendors` | Seller, VerificationCase | Apply, verify, approve | Registration and verification |
-| `catalogue` | Category, Brand, Product, ProductVariant, attributes | Define what can be sold | Full |
+| `catalogue` | Category, Brand, Product, ProductVariant, attributes | Define what can be sold, search published products | Full |
 | `listings` | Listing | A seller's offer: price and status for a variant | Vendra seller only |
 | `inventory` | StockItem, StockReservation, StockMovement | Reserve, release, commit, adjust | Full |
 | `warehousing` | Warehouse | Manage stocking locations | Basic |
@@ -27,6 +27,7 @@ Each aggregate has exactly one owner. Other modules hold its ID and call the own
 | `support` | Ticket | Raise and resolve | Contact channel only |
 | `cms` | Page, Banner | Publish content | Basic |
 | `analytics` | Read models | Reports | Basic dashboard |
+| `storefront` | Nothing (read side) | Combine published products, active offers and stock for customers | Full |
 | `administration` | Staff workflows | Orchestrates other modules' contracts, owns no aggregate | Full for launch flows |
 | `audit` | AuditLog | Record sensitive actions | Full |
 | `settings` | Setting | Platform configuration | Basic |
@@ -45,4 +46,4 @@ Each aggregate has exactly one owner. Other modules hold its ID and call the own
 
 ## Implementation status
 
-`identity` is built with HTTP endpoints. `payments`, `ledger` and `shipping` have domain rules, ports and Prisma persistence, but no HTTP endpoints yet. `audit` is currently a write helper in `platform` plus a read endpoint in `identity`. Modules are created when they are built, so the tree has no empty placeholders.
+`identity`, `catalogue`, `listings`, `inventory` and `storefront` are built with HTTP endpoints. `payments`, `ledger` and `shipping` have domain rules, ports and Prisma persistence, but no HTTP endpoints yet. `audit` is currently a write helper in `platform` plus a read endpoint in `identity`. Modules are created when they are built, so the tree has no empty placeholders.

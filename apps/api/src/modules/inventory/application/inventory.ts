@@ -149,3 +149,18 @@ export class InventoryService {
     return item ? toView(item) : null;
   }
 }
+
+/** What other modules may ask about stock. Reservations are already subtracted. */
+export class InventoryQueries {
+  constructor(private readonly stock: StockRepository) {}
+
+  /** Units available to sell per listing, summed across warehouses. Listings with no stock are 0. */
+  async availableByListing(listingIds: readonly string[]): Promise<Map<string, number>> {
+    const totals = new Map(listingIds.map((id) => [id, 0]));
+    if (listingIds.length === 0) return totals;
+    for (const row of await this.stock.listByListings(listingIds)) {
+      totals.set(row.listingId, (totals.get(row.listingId) ?? 0) + Math.max(0, row.available));
+    }
+    return totals;
+  }
+}

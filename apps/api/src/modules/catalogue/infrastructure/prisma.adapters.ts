@@ -97,7 +97,9 @@ export class PrismaBrandRepository implements BrandRepository {
   }
 }
 
-const productInclude = { variants: { orderBy: { sku: 'asc' } } } as const;
+const productInclude = {
+  variants: { orderBy: [{ position: 'asc' as const }, { sku: 'asc' as const }] },
+} satisfies Prisma.ProductInclude;
 type ProductRow = Prisma.ProductGetPayload<{ include: typeof productInclude }>;
 
 const toProduct = (row: ProductRow): Product =>
@@ -193,10 +195,13 @@ export class PrismaProductRepository implements ProductRepository {
           if (count !== 1) throw new ConcurrencyConflict('Product', state.id);
         }
         // Variants are only ever added, so insert those the database does not have.
-        const saved = new Set(
-          (await tx.productVariant.findMany({ where: { productId: state.id }, select: { id: true } })).map((v) => v.id),
-        );
-        const added = variantRows.filter((variant) => !saved.has(variant.id));
+        const existing = await tx.productVariant.findMany({ where: { productId: state.id }, select: { id: true, position: true } });
+        const saved = new Set(existing.map((v) => v.id));
+        // New variants go after existing ones. The version check above serialises concurrent saves.
+        const next = existing.reduce((max, v) => Math.max(max, v.position + 1), 0);
+        const added = variantRows
+          .filter((variant) => !saved.has(variant.id))
+          .map((variant, index) => ({ ...variant, position: next + index }));
         if (added.length > 0) await tx.productVariant.createMany({ data: added });
         await appendAudit(tx, audit);
         await appendToOutbox(tx, events);

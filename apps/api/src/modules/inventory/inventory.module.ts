@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../platform/prisma/prisma.service';
 import { ListingQueries } from '../listings';
 import { ListingsModule } from '../listings/listings.module';
-import { InventoryService } from './application/inventory';
+import { InventoryQueries, InventoryService } from './application/inventory';
 import { PrismaStockRepository, PrismaWarehouseRepository } from './infrastructure/prisma.adapters';
 import { InventoryController } from './interface/inventory.controller';
 
@@ -23,6 +23,12 @@ import { InventoryController } from './interface/inventory.controller';
           { now: () => new Date() },
         ),
     },
+    {
+      provide: InventoryQueries,
+      inject: [PrismaService],
+      useFactory: (prisma: PrismaService) => new InventoryQueries(new PrismaStockRepository(prisma)),
+    },
   ],
+  exports: [InventoryQueries],
 })
 export class InventoryModule {}

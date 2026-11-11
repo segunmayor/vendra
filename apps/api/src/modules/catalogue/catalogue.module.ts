@@ -3,11 +3,13 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../platform/prisma/prisma.service';
 import { CatalogueQueries } from './application/catalogue.queries';
 import { CatalogueService } from './application/catalogue.service';
+import { StorefrontCatalogue } from './application/storefront';
 import {
   PrismaBrandRepository,
   PrismaCategoryRepository,
   PrismaProductRepository,
 } from './infrastructure/prisma.adapters';
+import { PostgresProductSearch } from './infrastructure/product-search';
 import { CatalogueController } from './interface/catalogue.controller';
 
 @Module({
@@ -30,7 +32,13 @@ import { CatalogueController } from './interface/catalogue.controller';
       inject: [PrismaService],
       useFactory: (prisma: PrismaService) => new CatalogueQueries(new PrismaProductRepository(prisma)),
     },
+    {
+      provide: StorefrontCatalogue,
+      inject: [PrismaService],
+      useFactory: (prisma: PrismaService) =>
+        new StorefrontCatalogue(new PostgresProductSearch(prisma), new PrismaCategoryRepository(prisma)),
+    },
   ],
-  exports: [CatalogueQueries],
+  exports: [CatalogueQueries, StorefrontCatalogue],
 })
 export class CatalogueModule {}

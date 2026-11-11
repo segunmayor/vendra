@@ -12,7 +12,7 @@ Requires Node 22.18+ and pnpm 10.
 pnpm install
 pnpm --filter @vendra/api exec prisma generate
 cp .env.example apps/api/.env
-pnpm infra:up          # PostgreSQL, Redis, Meilisearch (needs Docker)
+pnpm infra:up          # PostgreSQL and Redis (needs Docker)
 pnpm --filter @vendra/api exec prisma migrate deploy
 pnpm dev
 ```
