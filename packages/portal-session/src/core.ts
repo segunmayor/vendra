@@ -28,6 +28,11 @@ export function cookieNames(audience: Audience, secure: boolean): CookieNames {
   return { access: `${prefix}vendra_${audience}_at`, refresh: `${prefix}vendra_${audience}_rt` };
 }
 
+/** Holds the second-step ticket between the password page and the code page. */
+export function challengeCookieName(audience: Audience, secure: boolean): string {
+  return `${secure ? '__Host-' : ''}vendra_${audience}_mfa`;
+}
+
 export interface CookieSpec {
   readonly name: string;
   readonly value: string;

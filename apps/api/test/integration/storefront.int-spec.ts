@@ -6,6 +6,7 @@ import { createApp } from '../../src/bootstrap';
 import { StaffService } from '../../src/modules/identity';
 import { PERMISSIONS } from '../../src/modules/identity/domain/permissions';
 import { Principal } from '../../src/shared-kernel';
+import { verifiedStaffToken } from './staff-mfa';
 
 const prisma = new PrismaClient();
 const PASSWORD = 'a-long-enough-password';
@@ -52,7 +53,7 @@ async function staffToken(permissions: readonly string[]): Promise<string> {
   const role = await staff.createRole(root, `role_${randomUUID()}`, permissions);
   const email = `staff_${randomUUID()}@example.com`;
   await staff.createStaff(root, email, PASSWORD, [role.id]);
-  return (await call('POST', 'admin/auth/login', { body: { email, password: PASSWORD } })).body.accessToken;
+  return verifiedStaffToken(call, email, PASSWORD);
 }
 
 const admin = (method: string, path: string, body?: unknown) => call(method, `admin/${path}`, { token: manager, body });

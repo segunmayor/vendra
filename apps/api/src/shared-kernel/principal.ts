@@ -6,6 +6,8 @@ export interface Principal {
   readonly sessionId: string;
   readonly audience: Audience;
   readonly permissions: readonly string[];
+  /** True only when this staff session passed a second factor (an authenticator code). */
+  readonly mfa?: boolean;
 }
 
 export interface AuditEntry {

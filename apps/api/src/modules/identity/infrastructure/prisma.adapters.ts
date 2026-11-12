@@ -1,4 +1,5 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { appendAudit } from '../../../platform/audit/audit';
 import { appendToOutbox } from '../../../platform/outbox/outbox';
 import { ApplicationError, Audience, AuditEntry } from '../../../shared-kernel';
@@ -7,6 +8,9 @@ import {
   AuditRecord,
   AuditTrail,
   LoginThrottle,
+  MfaChallengeView,
+  MfaRepository,
+  MfaState,
   NewSession,
   RoleRepository,
   RoleView,
@@ -94,6 +98,7 @@ const toSession = (row: SessionRow): SessionView => ({
   familyId: row.familyId,
   refreshTokenHash: row.refreshTokenHash,
   expiresAt: row.expiresAt,
+  mfa: row.mfa,
   revokedAt: row.revokedAt,
   audience: row.account.audience,
   accountStatus: row.account.status as AccountStatus,
@@ -223,6 +228,7 @@ export class PrismaRoleRepository implements RoleRepository {
         id: true,
         email: true,
         status: true,
+        mfaEnabledAt: true,
         roles: { select: { role: { select: { id: true, name: true } } } },
       },
     });
@@ -230,6 +236,7 @@ export class PrismaRoleRepository implements RoleRepository {
       id: row.id,
       email: row.email,
       status: row.status as AccountStatus,
+      mfaEnabled: row.mfaEnabledAt !== null,
       roles: row.roles.map(({ role }) => role),
     }));
   }
@@ -278,5 +285,105 @@ export class PrismaAuditTrail implements AuditTrail {
       after: (row.after as Record<string, unknown> | null) ?? undefined,
       ipAddress: row.ipAddress ?? undefined,
     }));
+  }
+}
+
+export class PrismaMfaRepository implements MfaRepository {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async find(accountId: string): Promise<MfaState | null> {
+    const row = await this.prisma.account.findUnique({
+      where: { id: accountId },
+      select: { id: true, audience: true, email: true, mfaSecret: true, mfaEnabledAt: true, mfaLastStep: true },
+    });
+    if (!row) return null;
+    return {
+      accountId: row.id,
+      audience: row.audience,
+      email: row.email,
+      sealedSecret: row.mfaSecret,
+      enabledAt: row.mfaEnabledAt,
+      lastStep: row.mfaLastStep === null ? null : Number(row.mfaLastStep),
+    };
+  }
+
+  async savePending(accountId: string, sealedSecret: string): Promise<boolean> {
+    const { count } = await this.prisma.account.updateMany({
+      where: { id: accountId, mfaEnabledAt: null },
+      data: { mfaSecret: sealedSecret, mfaLastStep: null },
+    });
+    return count === 1;
+  }
+
+  enable(accountId: string, step: number, codeHashes: readonly string[], sessionId: string, now: Date, audit: AuditEntry): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.account.updateMany({
+        where: { id: accountId, mfaEnabledAt: null, mfaSecret: { not: null } },
+        data: { mfaEnabledAt: now, mfaLastStep: BigInt(step) },
+      });
+      if (count !== 1) return false;
+      await tx.mfaRecoveryCode.deleteMany({ where: { accountId } });
+      await tx.mfaRecoveryCode.createMany({ data: codeHashes.map((codeHash) => ({ id: randomUUID(), accountId, codeHash })) });
+      await tx.session.updateMany({ where: { id: sessionId, accountId }, data: { mfa: true } });
+      // Anyone else signed in as this person did so without the second step.
+      await tx.session.updateMany({ where: { accountId, revokedAt: null, id: { not: sessionId } }, data: { revokedAt: now } });
+      await appendAudit(tx, audit);
+      return true;
+    });
+  }
+
+  async useStep(accountId: string, step: number): Promise<boolean> {
+    const count = await this.prisma.$executeRaw`
+      UPDATE "identity"."accounts" SET "mfaLastStep" = ${BigInt(step)}
+      WHERE "id" = ${accountId}::uuid AND "mfaEnabledAt" IS NOT NULL
+        AND ("mfaLastStep" IS NULL OR "mfaLastStep" < ${BigInt(step)})`;
+    return count === 1;
+  }
+
+  async useRecoveryCode(accountId: string, codeHash: string, now: Date): Promise<boolean> {
+    const { count } = await this.prisma.mfaRecoveryCode.updateMany({ where: { accountId, codeHash, usedAt: null }, data: { usedAt: now } });
+    return count === 1;
+  }
+
+  async replaceRecoveryCodes(accountId: string, codeHashes: readonly string[], audit: AuditEntry): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.mfaRecoveryCode.deleteMany({ where: { accountId } });
+      await tx.mfaRecoveryCode.createMany({ data: codeHashes.map((codeHash) => ({ id: randomUUID(), accountId, codeHash })) });
+      await appendAudit(tx, audit);
+    });
+  }
+
+  unusedRecoveryCodes(accountId: string): Promise<number> {
+    return this.prisma.mfaRecoveryCode.count({ where: { accountId, usedAt: null } });
+  }
+
+  async reset(accountId: string, now: Date, audit: AuditEntry): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.account.update({ where: { id: accountId }, data: { mfaSecret: null, mfaEnabledAt: null, mfaLastStep: null } });
+      await tx.mfaRecoveryCode.deleteMany({ where: { accountId } });
+      await tx.mfaChallenge.deleteMany({ where: { accountId } });
+      await tx.session.updateMany({ where: { accountId, revokedAt: null }, data: { revokedAt: now } });
+      await appendAudit(tx, audit);
+    });
+  }
+
+  async createChallenge(challenge: { id: string; accountId: string; tokenHash: string; expiresAt: Date }): Promise<void> {
+    await this.prisma.mfaChallenge.create({ data: challenge });
+  }
+
+  async findChallenge(tokenHash: string): Promise<MfaChallengeView | null> {
+    return this.prisma.mfaChallenge.findUnique({
+      where: { tokenHash },
+      select: { id: true, accountId: true, expiresAt: true, attempts: true, usedAt: true },
+    });
+  }
+
+  async recordChallengeAttempt(id: string): Promise<void> {
+    await this.prisma.mfaChallenge.update({ where: { id }, data: { attempts: { increment: 1 } } });
+  }
+
+  async consumeChallenge(id: string, now: Date): Promise<boolean> {
+    const { count } = await this.prisma.mfaChallenge.updateMany({ where: { id, usedAt: null }, data: { usedAt: now } });
+    return count === 1;
   }
 }

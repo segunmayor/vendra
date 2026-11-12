@@ -49,11 +49,12 @@ export const SETTINGS = {
   'security.customerSessionDays': { group: 'security', kind: 'integer', min: 1, max: 90, default: 30, unit: 'days', label: 'Customers stay signed in for', description: 'Applies to new sign-ins.' },
   'security.vendorSessionDays': { group: 'security', kind: 'integer', min: 1, max: 30, default: 14, unit: 'days', label: 'Sellers stay signed in for', description: 'Applies to new sign-ins.' },
   'security.staffSessionHours': { group: 'security', kind: 'integer', min: 1, max: 24, default: 12, unit: 'hours', label: 'Staff stay signed in for', description: 'Applies to new sign-ins.' },
+  'security.staffMfaRequired': { group: 'security', kind: 'boolean', default: true, label: 'Staff must use two-step sign-in', description: 'Staff without an authenticator app are asked to set one up before they can use Admin. Refunds, gateway keys and resetting two-step sign-in always need it, whatever this says.' },
 
   'payments.storefrontUrl': { group: 'payments', kind: 'url', default: 'http://localhost:3000', label: 'Customer site address', description: 'Customers return here after paying, for example https://vendra.ng.' },
   'payments.apiUrl': { group: 'payments', kind: 'url', default: 'http://localhost:4000', label: 'API address', description: 'Used to build the webhook address you enter in each gateway dashboard.' },
-  'payments.ledgerClearingAccount': { group: 'payments', kind: 'text', maxLength: 20, default: '1100', label: 'Ledger account for money held by gateways', description: 'Debited when a payment succeeds.' },
-  'payments.ledgerPrepaymentAccount': { group: 'payments', kind: 'text', maxLength: 20, default: '2100', label: 'Ledger account for customer prepayments', description: 'Credited when a payment succeeds, until the order is delivered.' },
+  'payments.ledgerClearingAccount': { group: 'payments', kind: 'text', maxLength: 20, default: '1100', label: 'Ledger account for money held by gateways', description: 'Debited when a payment succeeds, credited when a refund is confirmed.' },
+  'payments.ledgerPrepaymentAccount': { group: 'payments', kind: 'text', maxLength: 20, default: '2100', label: 'Ledger account for customer prepayments', description: 'Credited when a payment succeeds, until the order is delivered. Debited when a refund is confirmed.' },
 } as const satisfies Record<string, SettingDefinition>;
 
 export type SettingKey = keyof typeof SETTINGS;

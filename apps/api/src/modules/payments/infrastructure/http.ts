@@ -1,4 +1,4 @@
-import { ProviderUnavailable } from '../application/ports';
+import { ProviderRejected, ProviderUnavailable } from '../application/ports';
 
 const TIMEOUT_MS = 15_000;
 
@@ -20,10 +20,13 @@ export async function callGateway<T>(
     throw new ProviderUnavailable(`Could not reach ${label}. Please try again.`);
   }
   const body: unknown = await response.json().catch(() => null);
-  if (response.status === 401 || response.status === 403) throw new ProviderUnavailable(`${label} rejected the credentials`);
+  // A 4xx answer means the gateway read the request and refused it. A 5xx may mean it was
+  // partly processed, so it stays "unavailable": the outcome is not known.
+  if (response.status === 401 || response.status === 403) throw new ProviderRejected(`${label} rejected the credentials`);
   if (!response.ok) {
     const message = typeof body === 'object' && body && 'message' in body && typeof body.message === 'string' ? body.message.slice(0, 200) : `status ${response.status}`;
-    throw new ProviderUnavailable(`${label} refused the request: ${message}`);
+    const Failure = response.status >= 400 && response.status < 500 ? ProviderRejected : ProviderUnavailable;
+    throw new Failure(`${label} refused the request: ${message}`);
   }
   return body as T;
 }

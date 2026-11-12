@@ -1,6 +1,7 @@
 import { ApplicationError, Audience, DomainError, Principal } from '../../../shared-kernel';
 import { SettingsReader } from '../../settings';
 import { Account, assertPasswordAllowed, normalizeEmail } from '../domain/account';
+import { MfaChallenge, MfaService } from './mfa.service';
 import {
   AccessTokenService,
   AccountRepository,
@@ -24,11 +25,20 @@ export interface IssuedSession {
   readonly refreshTokenExpiresAt: Date;
 }
 
+/** For staff with two-step sign-in on, a correct password gives a challenge, not a session. */
+export type LoginResult = IssuedSession | (MfaChallenge & { readonly mfaRequired: true });
+
 export interface AccountProfile {
   readonly id: string;
   readonly audience: Audience;
   readonly email: string;
   readonly permissions: readonly string[];
+  readonly mfa: {
+    readonly enabled: boolean;
+    readonly verified: boolean;
+    /** True when this staff member must set up two-step sign-in before using Admin. */
+    readonly setupRequired: boolean;
+  };
 }
 
 /** One message for every failure, so responses do not reveal which accounts exist. */
@@ -50,6 +60,7 @@ export class AuthService {
     private readonly audit: AuditTrail,
     private readonly clock: Clock,
     private readonly settings: SettingsReader,
+    private readonly mfa: MfaService,
   ) {}
 
   /** Absolute session lifetime for new sessions. Rotating a token never extends it. */
@@ -70,10 +81,10 @@ export class AuthService {
       now,
     });
     await this.accounts.insert(account);
-    return this.openSession(account.snapshot.id, audience, now);
+    return this.openSession(account.snapshot.id, audience, now, false);
   }
 
-  async login(audience: Audience, rawEmail: string, password: string, ip: string): Promise<IssuedSession> {
+  async login(audience: Audience, rawEmail: string, password: string, ip: string): Promise<LoginResult> {
     const now = this.clock.now();
     let email: string;
     try {
@@ -122,7 +133,10 @@ export class AuthService {
     }
 
     await this.throttle.clear(emailKey);
-    const issued = await this.openSession(account.snapshot.id, audience, now);
+    if (audience === 'admin' && (await this.mfa.isEnabled(account.snapshot.id))) {
+      return { mfaRequired: true, ...(await this.mfa.openChallenge(account.snapshot.id)) };
+    }
+    const issued = await this.openSession(account.snapshot.id, audience, now, false);
     if (audience === 'admin') {
       await this.audit.record({
         actorId: account.snapshot.id,
@@ -133,6 +147,21 @@ export class AuthService {
       });
     }
     return issued;
+  }
+
+  /** The second step of a staff sign-in: a code from the authenticator app, or a recovery code. */
+  async completeMfaLogin(challengeToken: string, code: string, ip: string): Promise<IssuedSession> {
+    const accountId = await this.mfa.completeChallenge(challengeToken, code);
+    const account = await this.accounts.findById(accountId);
+    if (!account || !account.isActive || account.snapshot.audience !== 'admin') throw invalidCredentials();
+    const issued = await this.openSession(accountId, 'admin', this.clock.now(), true);
+    await this.audit.record({ actorId: accountId, action: 'auth.login', targetType: 'account', targetId: accountId, ipAddress: ip, after: { mfa: true } });
+    return issued;
+  }
+
+  /** Whether staff without a verified second factor are limited to setting one up. */
+  staffMfaRequired(): Promise<boolean> {
+    return this.mfa.staffRequired();
   }
 
   /** For other modules, such as payments, that need a customer's email address. */
@@ -157,6 +186,7 @@ export class AuthService {
       familyId: session.familyId,
       refreshTokenHash: this.secrets.hashToken(token),
       expiresAt: session.expiresAt,
+      mfa: session.mfa,
     };
     if (!(await this.sessions.rotate(session.id, next, now))) {
       await this.handleReuse(session.familyId, session.accountId, now);
@@ -188,14 +218,21 @@ export class AuthService {
     ) {
       throw sessionInvalid();
     }
-    return { ...claims, permissions: found.permissions };
+    return { ...claims, permissions: found.permissions, mfa: found.session.mfa };
   }
 
   async profile(principal: Principal): Promise<AccountProfile> {
     const account = await this.accounts.findById(principal.accountId);
     if (!account) throw sessionInvalid();
     const { id, audience, email } = account.snapshot;
-    return { id, audience, email, permissions: principal.permissions };
+    const status = await this.mfa.status(principal);
+    return {
+      id,
+      audience,
+      email,
+      permissions: principal.permissions,
+      mfa: { enabled: status.enabled, verified: status.verified, setupRequired: audience === 'admin' && status.required && !status.verified },
+    };
   }
 
   /** Signs out every device, including the current one. */
@@ -227,7 +264,7 @@ export class AuthService {
     });
   }
 
-  private async openSession(accountId: string, audience: Audience, now: Date): Promise<IssuedSession> {
+  private async openSession(accountId: string, audience: Audience, now: Date, mfa: boolean): Promise<IssuedSession> {
     const token = this.secrets.refreshToken();
     const session: NewSession = {
       id: this.secrets.uuid(),
@@ -235,6 +272,7 @@ export class AuthService {
       familyId: this.secrets.uuid(),
       refreshTokenHash: this.secrets.hashToken(token),
       expiresAt: new Date(now.getTime() + (await this.sessionLifetimeMs(audience))),
+      mfa,
     };
     await this.sessions.create(session);
     return this.issue(session, token, audience);

@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   ACCESS_EXPIRY_SKEW_MS,
   clientIpFrom,
+  challengeCookieName,
   cookieNames,
   RefreshCoalescer,
   safeNextPath,
@@ -20,6 +21,8 @@ const session = {
 test('production cookie names carry the __Host- prefix', () => {
   assert.deepEqual(cookieNames('admin', true), { access: '__Host-vendra_admin_at', refresh: '__Host-vendra_admin_rt' });
   assert.deepEqual(cookieNames('store', false), { access: 'vendra_store_at', refresh: 'vendra_store_rt' });
+  assert.equal(challengeCookieName('admin', true), '__Host-vendra_admin_mfa');
+  assert.equal(challengeCookieName('admin', false), 'vendra_admin_mfa');
 });
 
 test('each portal uses its own cookies', () => {

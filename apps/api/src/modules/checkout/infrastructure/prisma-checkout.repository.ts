@@ -1,5 +1,6 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
-import { ConcurrencyConflict, Money } from '../../../shared-kernel';
+import { appendToOutbox } from '../../../platform/outbox/outbox';
+import { ConcurrencyConflict, DomainEvent, Money } from '../../../shared-kernel';
 import { type CheckoutRepository, DuplicateCheckout } from '../application/checkout.service';
 import { CheckoutLine, CheckoutSession, CheckoutStatus, DeliveryAddress } from '../domain/checkout-session';
 
@@ -89,13 +90,16 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
     session.markSaved();
   }
 
-  async update(session: CheckoutSession): Promise<void> {
+  async update(session: CheckoutSession, events: readonly DomainEvent[] = []): Promise<void> {
     const state = session.snapshot;
-    const { count } = await this.prisma.checkoutSession.updateMany({
-      where: { id: state.id, version: state.version },
-      data: { status: state.status, paymentId: state.paymentId ?? null, stockIssue: state.stockIssue ?? false, version: { increment: 1 } },
+    await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.checkoutSession.updateMany({
+        where: { id: state.id, version: state.version },
+        data: { status: state.status, paymentId: state.paymentId ?? null, stockIssue: state.stockIssue ?? false, version: { increment: 1 } },
+      });
+      if (count !== 1) throw new ConcurrencyConflict('CheckoutSession', state.id);
+      await appendToOutbox(tx, events);
     });
-    if (count !== 1) throw new ConcurrencyConflict('CheckoutSession', state.id);
     session.markSaved();
   }
 }

@@ -26,6 +26,13 @@ export class FakeGateway {
   readonly transactions = new Map<string, FakeTransaction>();
   acceptedKeys = new Set<string>();
   failNext = false;
+  /** Refunds by the gateway's refund id, with the status the gateway reports. */
+  readonly refunds = new Map<number, string>();
+  /** The status a new refund starts in. */
+  refundStartStatus = { paystack: 'pending', flutterwave: 'completed' };
+  /** Make the next refund request refused (4xx) or cut off (5xx, outcome unknown). */
+  refundFailure: 'reject' | 'drop' | null = null;
+  private nextRefundId = Date.now();
   private server!: Server;
   base = '';
 
@@ -61,7 +68,24 @@ export class FakeGateway {
     if (!this.acceptedKeys.has(authorization.replace(/^Bearer /, ''))) return [401, { status: false, message: 'Invalid key' }];
     const body = text ? (JSON.parse(text) as Record<string, unknown>) : {};
 
+    if (/refund/.test(url.pathname) && request.method === 'POST' && this.refundFailure) {
+      const failure = this.refundFailure;
+      this.refundFailure = null;
+      if (failure === 'reject') return [400, { status: false, message: 'Transaction has been fully reversed' }];
+      return [502, { status: false, message: 'Bad gateway' }];
+    }
+
     // Paystack
+    if (url.pathname === '/paystack/refund' && request.method === 'POST') {
+      const id = ++this.nextRefundId;
+      this.refunds.set(id, this.refundStartStatus.paystack);
+      return [200, { status: true, message: 'Refund has been queued for processing', data: { transaction: { reference: body.transaction }, id, status: this.refunds.get(id), amount: body.amount } }];
+    }
+    if (url.pathname.startsWith('/paystack/refund/')) {
+      const id = Number(url.pathname.split('/').pop());
+      if (!this.refunds.has(id)) return [404, { status: false, message: 'Refund not found' }];
+      return [200, { status: true, data: { id, status: this.refunds.get(id) } }];
+    }
     if (url.pathname === '/paystack/transaction/initialize') {
       return [200, { status: true, message: 'Authorization URL created', data: { authorization_url: `https://checkout.paystack.com/${body.reference}`, access_code: 'ac', reference: body.reference } }];
     }
@@ -74,6 +98,16 @@ export class FakeGateway {
     if (url.pathname === '/paystack/balance') return [200, { status: true, data: [] }];
 
     // Flutterwave
+    if (/^\/flutterwave\/transactions\/\d+\/refund$/.test(url.pathname)) {
+      const id = ++this.nextRefundId;
+      this.refunds.set(id, this.refundStartStatus.flutterwave);
+      return [200, { status: 'success', message: 'Transaction refund initiated', data: { id, tx_id: Number(url.pathname.split('/')[3]), amount_refunded: body.amount, status: this.refunds.get(id) } }];
+    }
+    if (url.pathname.startsWith('/flutterwave/refunds/')) {
+      const id = Number(url.pathname.split('/').pop());
+      if (!this.refunds.has(id)) return [404, { status: 'error', message: 'Refund not found' }];
+      return [200, { status: 'success', data: { id, status: this.refunds.get(id) } }];
+    }
     if (url.pathname === '/flutterwave/payments') {
       return [200, { status: 'success', message: 'Hosted Link', data: { link: `https://checkout.flutterwave.com/v3/hosted/pay/${body.tx_ref}` } }];
     }

@@ -30,3 +30,30 @@ export class PostPaymentReceived {
     return this.journal.append(entry);
   }
 }
+
+/**
+ * Records money returned to a customer: the reverse of a payment received. Posting twice for
+ * one refund is a no-op.
+ */
+export class PostRefundPaid {
+  constructor(
+    private readonly journal: JournalRepository,
+    private readonly settings: SettingsReader,
+    private readonly ids: { uuid(): string },
+  ) {}
+
+  async execute(refundId: string, amount: Money, postedAt: Date): Promise<'posted' | 'duplicate'> {
+    const [clearing, prepayments] = await this.settings.getMany(['payments.ledgerClearingAccount', 'payments.ledgerPrepaymentAccount'] as const);
+    const entry = JournalEntry.post({
+      id: this.ids.uuid(),
+      sourceType: 'refund_paid',
+      sourceId: refundId,
+      postedAt,
+      lines: [
+        { accountCode: prepayments, side: 'debit', amount },
+        { accountCode: clearing, side: 'credit', amount },
+      ],
+    });
+    return this.journal.append(entry);
+  }
+}

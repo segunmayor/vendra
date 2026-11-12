@@ -19,6 +19,7 @@ function setup() {
     name: 'test',
     initialize: jest.fn(),
     refund: jest.fn(),
+    refundStatus: jest.fn(),
     testConnection: jest.fn(),
     verify,
     parseWebhook: (_raw, headers) => {

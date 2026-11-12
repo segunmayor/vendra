@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
-import { GUEST_ALLOWED, IS_PUBLIC, REQUIRED_PERMISSION, SURFACE } from '../../../platform/http/auth.decorators';
+import { GUEST_ALLOWED, IS_PUBLIC, MFA_EXEMPT, REQUIRE_MFA, REQUIRED_PERMISSION, SURFACE } from '../../../platform/http/auth.decorators';
 import { ApplicationError, Audience, Principal } from '../../../shared-kernel';
 import { AuthService } from '../application/auth.service';
 
@@ -32,7 +32,18 @@ export class AuthGuard implements CanActivate {
     if (permission && !principal.permissions.includes(permission)) {
       throw new ApplicationError('forbidden', 'auth.permission_denied', 'You do not have permission to do this');
     }
+    if (surface === 'admin' && principal.mfa !== true) await this.checkMfa(targets);
     request.principal = principal;
     return true;
+  }
+
+  private async checkMfa(targets: Parameters<Reflector['getAllAndOverride']>[1]): Promise<void> {
+    if (this.reflector.getAllAndOverride<boolean>(REQUIRE_MFA, targets)) {
+      throw new ApplicationError('forbidden', 'auth.mfa_required', 'Turn on two-step sign-in and sign in with your authenticator code to do this.');
+    }
+    if (this.reflector.getAllAndOverride<boolean>(MFA_EXEMPT, targets)) return;
+    if (await this.auth.staffMfaRequired()) {
+      throw new ApplicationError('forbidden', 'auth.mfa_setup_required', 'Set up two-step sign-in to continue.');
+    }
   }
 }

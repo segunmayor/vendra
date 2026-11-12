@@ -1,7 +1,8 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Money } from '../../../shared-kernel';
-import { InitializePaymentRequest, InvalidWebhookSignature, PaymentProviderPort, ProviderUnavailable, WebhookNotice } from '../application/ports';
+import { InitializePaymentRequest, InvalidWebhookSignature, PaymentProviderPort, ProviderUnavailable, RefundRequest, WebhookNotice } from '../application/ports';
 import { ProviderVerification } from '../domain/payment';
+import { GatewayRefundResult } from '../domain/refund';
 import { callGateway } from './http';
 
 interface Envelope<T> {
@@ -14,7 +15,24 @@ interface Envelope<T> {
  * Paystack, per its published OpenAPI description (PaystackOSS/openapi, checked 11 Nov 2026):
  * amounts are integers in kobo; verify is GET /transaction/verify/{reference}.
  * Webhooks carry x-paystack-signature, an HMAC-SHA512 of the raw body keyed with the secret key.
+ * Refunds are POST /refund with the transaction reference and an amount in kobo (left out for
+ * a full refund); GET /refund/{id} reports progress.
  */
+interface RefundData {
+  id?: number;
+  status?: string;
+}
+
+/** "processed" is final success; "failed" is final; pending, processing and needs-attention are still open. */
+function refundResult(data: RefundData | undefined): GatewayRefundResult {
+  const status = String(data?.status ?? 'pending');
+  return {
+    providerRefundId: data?.id === undefined ? '' : String(data.id),
+    outcome: status === 'processed' ? 'succeeded' : status === 'failed' ? 'failed' : 'pending',
+    gatewayStatus: status,
+  };
+}
+
 export class PaystackProvider implements PaymentProviderPort {
   readonly name = 'paystack';
 
@@ -60,9 +78,19 @@ export class PaystackProvider implements PaymentProviderPort {
     return { eventId: `${payload.event ?? 'unknown'}:${payload.data?.id ?? payload.data?.reference ?? 'none'}`, reference: payload.data?.reference ?? '' };
   }
 
-  async refund(providerTransactionId: string, amount: Money): Promise<{ providerRefundId: string }> {
-    const body = await this.call<Envelope<{ id?: number }>>('POST', '/refund', { transaction: providerTransactionId, amount: Number(amount.minor), currency: amount.currency });
-    return { providerRefundId: String(body.data?.id ?? '') };
+  async refund(request: RefundRequest): Promise<GatewayRefundResult> {
+    const body = await this.call<Envelope<RefundData>>('POST', '/refund', {
+      transaction: request.reference,
+      ...(request.full ? {} : { amount: Number(request.amount.minor) }),
+      currency: request.amount.currency,
+      merchant_note: request.note.slice(0, 200),
+    });
+    return refundResult(body.data);
+  }
+
+  async refundStatus(providerRefundId: string): Promise<GatewayRefundResult> {
+    const body = await this.call<Envelope<RefundData>>('GET', `/refund/${encodeURIComponent(providerRefundId)}`);
+    return refundResult(body.data);
   }
 
   async testConnection(): Promise<void> {

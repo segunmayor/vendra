@@ -81,17 +81,21 @@ enum AccountAudience {
 }
 
 model Account {
-  id           String          @id @default(uuid()) @db.Uuid
-  audience     AccountAudience
-  email        String
-  phone        String?
-  passwordHash String
-  status       String          @default("active")
-  mfaSecret    String?
-  createdAt    DateTime        @default(now()) @db.Timestamptz
-  updatedAt    DateTime        @updatedAt @db.Timestamptz
-  sessions     Session[]
-  roles        AccountRole[]
+  id            String            @id @default(uuid()) @db.Uuid
+  audience      AccountAudience
+  email         String
+  phone         String?
+  passwordHash  String
+  status        String            @default("active")
+  mfaSecret     String?
+  mfaEnabledAt  DateTime?         @db.Timestamptz
+  mfaLastStep   BigInt?
+  createdAt     DateTime          @default(now()) @db.Timestamptz
+  updatedAt     DateTime          @updatedAt @db.Timestamptz
+  sessions      Session[]
+  roles         AccountRole[]
+  recoveryCodes MfaRecoveryCode[]
+  mfaChallenges MfaChallenge[]
 
   @@unique([audience, email])
   @@map("accounts")
@@ -115,11 +119,40 @@ model Session {
   refreshTokenHash String    @unique
   expiresAt        DateTime  @db.Timestamptz
   revokedAt        DateTime? @db.Timestamptz
+  mfa              Boolean   @default(false)
   createdAt        DateTime  @default(now()) @db.Timestamptz
   account          Account   @relation(fields: [accountId], references: [id])
 
   @@index([familyId])
   @@map("sessions")
+  @@schema("identity")
+}
+
+model MfaRecoveryCode {
+  id        String    @id @db.Uuid
+  accountId String    @db.Uuid
+  codeHash  String
+  usedAt    DateTime? @db.Timestamptz
+  createdAt DateTime  @default(now()) @db.Timestamptz
+  account   Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, codeHash])
+  @@map("mfa_recovery_codes")
+  @@schema("identity")
+}
+
+model MfaChallenge {
+  id        String    @id @db.Uuid
+  accountId String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime  @db.Timestamptz
+  attempts  Int       @default(0)
+  usedAt    DateTime? @db.Timestamptz
+  createdAt DateTime  @default(now()) @db.Timestamptz
+  account   Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@map("mfa_challenges")
   @@schema("identity")
 }
 
@@ -432,8 +465,11 @@ model CartItem {
 model Order {
   id              String        @id @default(uuid()) @db.Uuid
   number          String        @unique
+  /// The paid checkout this order came from. One order per checkout.
+  checkoutId      String        @unique @db.Uuid
+  paymentId       String        @db.Uuid
   customerId      String        @db.Uuid
-  status          String        @default("pending_payment")
+  status          String        @default("placed")
   currency        String        @db.Char(3)
   subtotalMinor   BigInt
   deliveryMinor   BigInt
@@ -441,11 +477,13 @@ model Order {
   totalMinor      BigInt
   shippingAddress Json
   version         Int           @default(0)
+  placedAt        DateTime      @default(now()) @db.Timestamptz
   createdAt       DateTime      @default(now()) @db.Timestamptz
   updatedAt       DateTime      @updatedAt @db.Timestamptz
   sellerOrders    SellerOrder[]
 
   @@index([customerId, createdAt])
+  @@index([status, placedAt])
   @@map("orders")
   @@schema("orders")
 }
@@ -455,6 +493,7 @@ model SellerOrder {
   orderId  String      @db.Uuid
   sellerId String      @db.Uuid
   status   String      @default("pending")
+  position Int         @default(0)
   version  Int         @default(0)
   order    Order       @relation(fields: [orderId], references: [id])
   lines    OrderLine[]
@@ -469,10 +508,14 @@ model OrderLine {
   id             String      @id @default(uuid()) @db.Uuid
   sellerOrderId  String      @db.Uuid
   listingId      String      @db.Uuid
+  variantId      String      @db.Uuid
   productName    String
   sku            String
+  options        Json        @default("{}")
   quantity       Int
   unitPriceMinor BigInt
+  lineTotalMinor BigInt
+  position       Int         @default(0)
   sellerOrder    SellerOrder @relation(fields: [sellerOrderId], references: [id])
 
   @@index([sellerOrderId])
@@ -506,6 +549,7 @@ model Payment {
   status                PaymentStatus    @default(initiated)
   providerTransactionId String?
   refundedMinor         BigInt           @default(0)
+  refundPendingMinor    BigInt           @default(0)
   version               Int              @default(0)
   createdAt             DateTime         @default(now()) @db.Timestamptz
   updatedAt             DateTime         @updatedAt @db.Timestamptz
@@ -572,7 +616,12 @@ model Refund {
   providerRefundId String?
   reason           String
   requestedBy      String   @db.Uuid
+  gatewayStatus    String?
+  failureReason    String?
+  resolvedBy       String?  @db.Uuid
+  version          Int      @default(0)
   createdAt        DateTime @default(now()) @db.Timestamptz
+  updatedAt        DateTime @default(now()) @updatedAt @db.Timestamptz
   payment          Payment  @relation(fields: [paymentId], references: [id])
 
   @@index([paymentId])

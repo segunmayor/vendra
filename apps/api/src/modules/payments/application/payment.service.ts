@@ -166,7 +166,8 @@ export class PaymentService {
       initialize: (request) => provider.initialize(request),
       verify: (reference) => provider.verify(reference),
       parseWebhook: (body, values) => provider.parseWebhook(body, values),
-      refund: (id, amount) => provider.refund(id, amount),
+      refund: (request) => provider.refund(request),
+      refundStatus: (id) => provider.refundStatus(id),
       testConnection: () => provider.testConnection(),
     };
     const outcome = await new ProcessPaymentWebhook(named, scoped, this.inbox, this.clock).execute(rawBody, headers);

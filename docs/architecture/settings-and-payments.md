@@ -67,6 +67,6 @@ The admin portal's **Payment gateways** page lets staff add as many gateways as 
 
 ## Not built yet
 
-- Refunds from the admin portal. These wait for staff MFA (Step 6b).
+- Refunds are built: see [staff-mfa-and-refunds.md](staff-mfa-and-refunds.md).
 - Reconciliation against gateway records.
-- Turning a paid checkout into an order with delivery tracking (Step 7).
+- Delivery tracking (Step 8). Orders are built: see [orders.md](orders.md).

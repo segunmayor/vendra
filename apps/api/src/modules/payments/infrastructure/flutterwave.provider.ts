@@ -1,7 +1,8 @@
 import { timingSafeEqual } from 'node:crypto';
 import { Money } from '../../../shared-kernel';
-import { InitializePaymentRequest, InvalidWebhookSignature, PaymentProviderPort, ProviderUnavailable, WebhookNotice } from '../application/ports';
+import { InitializePaymentRequest, InvalidWebhookSignature, PaymentProviderPort, ProviderRejected, ProviderUnavailable, RefundRequest, WebhookNotice } from '../application/ports';
 import { ProviderVerification } from '../domain/payment';
+import { GatewayRefundResult } from '../domain/refund';
 import { callGateway, majorToMinor, minorToMajor } from './http';
 
 interface Envelope<T> {
@@ -15,7 +16,24 @@ interface Envelope<T> {
  * POST /payments with the amount in major units, returning data.link; verify is
  * GET /transactions/verify_by_reference?tx_ref=; webhooks carry the merchant's secret hash
  * in a verif-hash header (a plain comparison, not a signature over the body).
+ * Refunds are POST /transactions/{id}/refund, with a whole-naira amount for a partial refund
+ * (the reference documents it as an integer). Progress is GET /refunds/{id}.
  */
+interface RefundData {
+  id?: number;
+  status?: string;
+}
+
+/** "completed" is final success; "failed" is final; anything else is still in progress. */
+function refundResult(data: RefundData | undefined): GatewayRefundResult {
+  const status = String(data?.status ?? 'pending');
+  return {
+    providerRefundId: data?.id === undefined ? '' : String(data.id),
+    outcome: status === 'completed' || status === 'successful' ? 'succeeded' : status === 'failed' ? 'failed' : 'pending',
+    gatewayStatus: status,
+  };
+}
+
 export class FlutterwaveProvider implements PaymentProviderPort {
   readonly name = 'flutterwave';
 
@@ -65,11 +83,20 @@ export class FlutterwaveProvider implements PaymentProviderPort {
     return { eventId: `${payload.event ?? 'unknown'}:${payload.data?.id ?? 'none'}:${payload.data?.status ?? ''}`, reference: payload.data?.tx_ref ?? '' };
   }
 
-  async refund(providerTransactionId: string, amount: Money): Promise<{ providerRefundId: string }> {
-    const body = await this.call<Envelope<{ id?: number }>>('POST', `/transactions/${encodeURIComponent(providerTransactionId)}/refund`, {
-      amount: Number(minorToMajor(amount.minor)),
+  async refund(request: RefundRequest): Promise<GatewayRefundResult> {
+    if (!request.full && request.amount.minor % 100n !== 0n) {
+      throw new ProviderRejected('Flutterwave only accepts part refunds in whole naira. Round the amount, or refund in full.');
+    }
+    const body = await this.call<Envelope<RefundData>>('POST', `/transactions/${encodeURIComponent(request.transactionId)}/refund`, {
+      ...(request.full ? {} : { amount: Number(request.amount.minor / 100n) }),
+      comments: request.note.slice(0, 200),
     });
-    return { providerRefundId: String(body.data?.id ?? '') };
+    return refundResult(body.data);
+  }
+
+  async refundStatus(providerRefundId: string): Promise<GatewayRefundResult> {
+    const body = await this.call<Envelope<RefundData>>('GET', `/refunds/${encodeURIComponent(providerRefundId)}`);
+    return refundResult(body.data);
   }
 
   async testConnection(): Promise<void> {

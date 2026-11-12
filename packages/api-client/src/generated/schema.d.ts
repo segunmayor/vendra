@@ -343,6 +343,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/auth/mfa/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Second step of sign-in: a code from the app, or a recovery code */
+        post: operations["adminMfaVerify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/auth/mfa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminMfaStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/auth/mfa/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Starts setting up an authenticator app */
+        post: operations["adminMfaSetup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/auth/mfa/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turns two-step sign-in on. Returns recovery codes once. */
+        post: operations["adminMfaConfirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/auth/mfa/recovery-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replaces the recovery codes */
+        post: operations["adminMfaRecoveryCodes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/permissions": {
         parameters: {
             query?: never;
@@ -417,6 +501,23 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["adminSuspendStaff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/staff/{id}/mfa/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turns off two-step sign-in for someone who lost their phone, and signs them out */
+        post: operations["adminResetStaffMfa"];
         delete?: never;
         options?: never;
         head?: never;
@@ -988,6 +1089,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/payments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminGetPayment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/payments/{id}/refunds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Returns money through the gateway the customer paid with */
+        post: operations["adminRefundPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/refunds/{id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Asks the gateway how the refund is going */
+        post: operations["adminCheckRefund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/refunds/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Records what the gateway dashboard shows for a refund in doubt */
+        post: operations["adminResolveRefund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/store/payment-options": {
         parameters: {
             query?: never;
@@ -1032,6 +1200,105 @@ export interface paths {
         put?: never;
         /** Asks the gateway for the payment result. Call on return from the gateway. */
         post: operations["storeVerifyPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your orders, newest first */
+        get: operations["storeListOrders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store/orders/by-checkout/{checkoutId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The order a paid checkout became */
+        get: operations["storeOrderForCheckout"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store/orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["storeGetOrder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Latest 100 orders, optionally by status or order number */
+        get: operations["adminListOrders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/orders/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminOrderCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminGetOrder"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1100,16 +1367,60 @@ export interface components {
         RefreshDto: {
             refreshToken: string;
         };
+        ProfileMfa: {
+            enabled: boolean;
+            verified: boolean;
+            setupRequired: boolean;
+        };
         ProfileResponse: {
             id: string;
             /** @enum {string} */
             audience: "store" | "admin" | "vendor";
             email: string;
             permissions: string[];
+            mfa: components["schemas"]["ProfileMfa"];
         };
         ChangePasswordDto: {
             currentPassword: string;
             newPassword: string;
+        };
+        AdminLoginResponse: {
+            accountId?: string;
+            accessToken?: string;
+            /** Format: date-time */
+            accessTokenExpiresAt?: string;
+            refreshToken?: string;
+            /** Format: date-time */
+            refreshTokenExpiresAt?: string;
+            /** @description True when the second step is needed: send the challenge token and a code to /v1/admin/auth/mfa/verify. */
+            mfaRequired?: boolean;
+            challengeToken?: string;
+            /** Format: date-time */
+            challengeExpiresAt?: string;
+        };
+        MfaVerifyDto: {
+            challengeToken: string;
+            /** @description Six digits from the authenticator app, or a recovery code */
+            code: string;
+        };
+        MfaStatusResponse: {
+            enabled: boolean;
+            verified: boolean;
+            required: boolean;
+            recoveryCodesLeft: number;
+        };
+        MfaEnrolmentResponse: {
+            /** @description Base32 secret, for typing into an app by hand */
+            secret: string;
+            /** @description otpauth:// address, for a QR code */
+            uri: string;
+        };
+        MfaCodeDto: {
+            /** @description Six digits from the authenticator app */
+            code: string;
+        };
+        RecoveryCodesResponse: {
+            recoveryCodes: string[];
         };
         RoleResponse: {
             id: string;
@@ -1129,6 +1440,7 @@ export interface components {
             email: string;
             /** @enum {string} */
             status: "active" | "suspended";
+            mfaEnabled: boolean;
             roles: components["schemas"]["StaffRoleResponse"][];
         };
         CreateStaffDto: {
@@ -1567,6 +1879,51 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        RefundResponse: {
+            id: string;
+            paymentId: string;
+            amountMinor: string;
+            currency: string;
+            reason: string;
+            requestedBy: string;
+            /** @enum {string} */
+            status: "pending" | "submitted" | "succeeded" | "failed" | "unknown";
+            providerRefundId?: string | null;
+            gatewayStatus?: string | null;
+            failureReason?: string | null;
+            resolvedBy?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PaymentDetailResponse: {
+            id: string;
+            reference: string;
+            checkoutId: string;
+            provider: string;
+            gatewayId?: string | null;
+            providerTransactionId?: string | null;
+            /** @enum {string} */
+            status: "initiated" | "succeeded" | "failed" | "requires_review" | "partially_refunded" | "refunded";
+            amountMinor: string;
+            /** @description Confirmed returned to the customer */
+            refundedMinor: string;
+            /** @description In refunds the gateway has not confirmed yet */
+            refundPendingMinor: string;
+            refundableMinor: string;
+            currency: string;
+            refunds: components["schemas"]["RefundResponse"][];
+        };
+        RefundDto: {
+            /** @description In kobo, as a string of digits */
+            amountMinor: string;
+            reason: string;
+        };
+        ResolveRefundDto: {
+            /** @enum {string} */
+            outcome: "succeeded" | "failed";
+            /** @description What the gateway dashboard shows */
+            note: string;
+        };
         PaymentOptionResponse: {
             id: string;
             name: string;
@@ -1584,6 +1941,101 @@ export interface components {
             /** @enum {string} */
             status: "initiated" | "succeeded" | "failed" | "requires_review" | "partially_refunded" | "refunded";
             checkoutId: string;
+        };
+        OrderSummaryResponse: {
+            id: string;
+            number: string;
+            /** @enum {string} */
+            status: "placed" | "stock_issue" | "cancelled" | "fulfilled";
+            /** Format: date-time */
+            placedAt: string;
+            total: components["schemas"]["MoneyDto"];
+            /** @description Units, counting each quantity */
+            itemCount: number;
+            /** @description Different items */
+            lineCount: number;
+            /** @description The first item, for a short description */
+            firstItem: string;
+            city: string;
+            state: string;
+        };
+        OrderAddressDto: {
+            recipient: string;
+            phone: string;
+            line1: string;
+            line2?: string | null;
+            city: string;
+            state: string;
+        };
+        OrderLineDto: {
+            listingId: string;
+            sku: string;
+            productName: string;
+            options: {
+                [key: string]: string;
+            };
+            quantity: number;
+            unitPrice: components["schemas"]["MoneyDto"];
+            lineTotal: components["schemas"]["MoneyDto"];
+        };
+        SellerOrderDto: {
+            id: string;
+            sellerId: string;
+            /** @enum {string} */
+            status: "pending" | "cancelled" | "dispatched" | "delivered";
+            lines: components["schemas"]["OrderLineDto"][];
+        };
+        OrderResponse: {
+            id: string;
+            number: string;
+            /** @enum {string} */
+            status: "placed" | "stock_issue" | "cancelled" | "fulfilled";
+            /** Format: date-time */
+            placedAt: string;
+            total: components["schemas"]["MoneyDto"];
+            /** @description Units, counting each quantity */
+            itemCount: number;
+            /** @description Different items */
+            lineCount: number;
+            /** @description The first item, for a short description */
+            firstItem: string;
+            city: string;
+            state: string;
+            subtotal: components["schemas"]["MoneyDto"];
+            delivery: components["schemas"]["MoneyDto"];
+            address: components["schemas"]["OrderAddressDto"];
+            sellerOrders: components["schemas"]["SellerOrderDto"][];
+        };
+        OrderCountsResponse: {
+            /** @description Orders in each status */
+            byStatus: {
+                [key: string]: number;
+            };
+        };
+        AdminOrderResponse: {
+            id: string;
+            number: string;
+            /** @enum {string} */
+            status: "placed" | "stock_issue" | "cancelled" | "fulfilled";
+            /** Format: date-time */
+            placedAt: string;
+            total: components["schemas"]["MoneyDto"];
+            /** @description Units, counting each quantity */
+            itemCount: number;
+            /** @description Different items */
+            lineCount: number;
+            /** @description The first item, for a short description */
+            firstItem: string;
+            city: string;
+            state: string;
+            subtotal: components["schemas"]["MoneyDto"];
+            delivery: components["schemas"]["MoneyDto"];
+            address: components["schemas"]["OrderAddressDto"];
+            sellerOrders: components["schemas"]["SellerOrderDto"][];
+            paymentId: string;
+            checkoutId: string;
+            customerId: string;
+            customerEmail?: string | null;
         };
     };
     responses: never;
@@ -1930,7 +2382,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SessionResponse"];
+                    "application/json": components["schemas"]["AdminLoginResponse"];
                 };
             };
         };
@@ -2065,6 +2517,113 @@ export interface operations {
             };
         };
     };
+    adminMfaVerify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaVerifyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+        };
+    };
+    adminMfaStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MfaStatusResponse"];
+                };
+            };
+        };
+    };
+    adminMfaSetup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MfaEnrolmentResponse"];
+                };
+            };
+        };
+    };
+    adminMfaConfirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaCodeDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCodesResponse"];
+                };
+            };
+        };
+    };
+    adminMfaRecoveryCodes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaCodeDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCodesResponse"];
+                };
+            };
+        };
+    };
     adminListPermissions: {
         parameters: {
             query?: never;
@@ -2192,6 +2751,25 @@ export interface operations {
         };
     };
     adminSuspendStaff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    adminResetStaffMfa: {
         parameters: {
             query?: never;
             header?: never;
@@ -3194,6 +3772,98 @@ export interface operations {
             };
         };
     };
+    adminGetPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentDetailResponse"];
+                };
+            };
+        };
+    };
+    adminRefundPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefundDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundResponse"];
+                };
+            };
+        };
+    };
+    adminCheckRefund: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundResponse"];
+                };
+            };
+        };
+    };
+    adminResolveRefund: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveRefundDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundResponse"];
+                };
+            };
+        };
+    };
     storePaymentOptions: {
         parameters: {
             query?: never;
@@ -3255,6 +3925,129 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VerifyResponse"];
+                };
+            };
+        };
+    };
+    storeListOrders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderSummaryResponse"][];
+                };
+            };
+        };
+    };
+    storeOrderForCheckout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                checkoutId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+        };
+    };
+    storeGetOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+        };
+    };
+    adminListOrders: {
+        parameters: {
+            query?: {
+                number?: string;
+                status?: "placed" | "stock_issue" | "cancelled" | "fulfilled";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderSummaryResponse"][];
+                };
+            };
+        };
+    };
+    adminOrderCounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderCountsResponse"];
+                };
+            };
+        };
+    };
+    adminGetOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminOrderResponse"];
                 };
             };
         };

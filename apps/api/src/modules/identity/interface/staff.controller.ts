@@ -1,9 +1,10 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { CurrentPrincipal, RequirePermission, Surface } from '../../../platform/http/auth.decorators';
+import { CurrentPrincipal, RequireMfa, RequirePermission, Surface } from '../../../platform/http/auth.decorators';
 import { ZodPipe } from '../../../platform/http/zod.pipe';
 import { Principal } from '../../../shared-kernel';
 import { AuditRecord, RoleView, StaffView } from '../application/ports';
+import { MfaService } from '../application/mfa.service';
 import { StaffService } from '../application/staff.service';
 import {
   auditQuerySchema,
@@ -25,7 +26,10 @@ import {
 @Surface('admin')
 @Controller({ path: 'admin', version: '1' })
 export class StaffController {
-  constructor(private readonly staff: StaffService) {}
+  constructor(
+    private readonly staff: StaffService,
+    private readonly mfa: MfaService,
+  ) {}
 
   @Get('permissions')
   @RequirePermission('roles.manage')
@@ -96,6 +100,19 @@ export class StaffController {
     @Param('id', new ZodPipe(uuidSchema)) id: string,
   ): Promise<void> {
     return this.staff.suspend(actor, id);
+  }
+
+  @Post('staff/:id/mfa/reset')
+  @HttpCode(204)
+  @RequirePermission('staff.manage')
+  @RequireMfa()
+  @ApiOperation({ operationId: 'adminResetStaffMfa', summary: 'Turns off two-step sign-in for someone who lost their phone, and signs them out' })
+  @ApiNoContentResponse()
+  resetMfa(
+    @CurrentPrincipal() actor: Principal,
+    @Param('id', new ZodPipe(uuidSchema)) id: string,
+  ): Promise<void> {
+    return this.mfa.reset(actor, id);
   }
 
   @Get('audit-logs')

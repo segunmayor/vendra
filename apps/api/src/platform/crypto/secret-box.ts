@@ -38,4 +38,9 @@ export class SecretBox {
   }
 }
 
-export class SecretBoxError extends Error {}
+export class SecretBoxError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SecretBoxError';
+  }
+}

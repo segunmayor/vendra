@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 import { cache } from 'react';
 import {
   type Audience,
+  challengeCookieName,
   clientIpFrom,
   cookieNames,
   expiredCookies,
@@ -137,7 +138,13 @@ export function createPortalSession(audience: Audience, options: PortalSessionOp
     redirect(`${loginPath}?next=${encodeURIComponent(await currentPath())}`);
   }
 
-  async function authenticate(email: string, password: string, kind: 'login' | 'register'): Promise<ActionResult> {
+  /** After sign-in or registration succeeds. */
+  async function signedIn(issued: IssuedSession): Promise<void> {
+    await writeSession(issued);
+    if (options.onSignedIn) await options.onSignedIn(issued.accessToken).catch(() => undefined);
+  }
+
+  async function authenticate(email: string, password: string, kind: 'login' | 'register'): Promise<ActionResult<{ mfaRequired: boolean }>> {
     const config = settings();
     const forwardedFor = (await headers()).get('x-forwarded-for');
     let response: Response;
@@ -150,10 +157,52 @@ export function createPortalSession(audience: Audience, options: PortalSessionOp
       const fallback = kind === 'login' ? 'Incorrect email or password' : 'We could not create your account';
       return { ok: false, message: response.status >= 500 ? 'Something went wrong. Please try again.' : await problemMessage(response, fallback) };
     }
-    const issued = (await response.json()) as IssuedSession;
-    await writeSession(issued);
-    if (options.onSignedIn) await options.onSignedIn(issued.accessToken).catch(() => undefined);
-    return { ok: true, data: undefined };
+    const body = (await response.json()) as IssuedSession | { mfaRequired: true; challengeToken: string; challengeExpiresAt: string };
+    if ('mfaRequired' in body && body.mfaRequired) {
+      // The ticket for the second step stays in an httpOnly cookie, never in the address bar.
+      const { secure } = settings();
+      (await cookies()).set({
+        name: challengeCookieName(audience, secure),
+        value: body.challengeToken,
+        httpOnly: true,
+        secure,
+        sameSite: 'strict',
+        path: '/',
+        expires: new Date(body.challengeExpiresAt),
+      });
+      return { ok: true, data: { mfaRequired: true } };
+    }
+    await signedIn(body as IssuedSession);
+    return { ok: true, data: { mfaRequired: false } };
+  }
+
+  /** Staff only: the second step of signing in, with a code from the app or a recovery code. */
+  async function completeMfa(code: string): Promise<ActionResult> {
+    const config = settings();
+    const store = await cookies();
+    const name = challengeCookieName(audience, config.secure);
+    const challengeToken = store.get(name)?.value;
+    const expired = { ok: false as const, message: 'Your sign-in has expired. Enter your email and password again.' };
+    if (!challengeToken) return expired;
+    const forwardedFor = (await headers()).get('x-forwarded-for');
+    let response: Response;
+    try {
+      response = await postJson(config, `/v1/${audience}/auth/mfa/verify`, { challengeToken, code }, portalHeaders(config, forwardedFor));
+    } catch {
+      return { ok: false, message: 'We could not reach the store. Please try again in a moment.' };
+    }
+    if (response.ok) {
+      store.delete(name);
+      await signedIn((await response.json()) as IssuedSession);
+      return { ok: true, data: undefined };
+    }
+    const body: unknown = await response.json().catch(() => null);
+    if (isProblem(body) && body.code === 'auth.mfa_challenge_invalid') {
+      store.delete(name);
+      return expired;
+    }
+    if (response.status >= 500) return { ok: false, message: 'Something went wrong. Please try again.' };
+    return { ok: false, message: isProblem(body) ? body.detail : 'That code is not right' };
   }
 
   /**
@@ -196,6 +245,12 @@ export function createPortalSession(audience: Audience, options: PortalSessionOp
 
     signIn: (email: string, password: string) => authenticate(email, password, 'login'),
     register: (email: string, password: string) => authenticate(email, password, 'register'),
+    completeMfa,
+
+    /** Whether a password was accepted and the second step is waiting. */
+    async hasMfaChallenge(): Promise<boolean> {
+      return Boolean((await cookies()).get(challengeCookieName(audience, settings().secure))?.value);
+    },
 
     /** Ends the session in the API as well as in the browser. */
     async signOut(): Promise<void> {

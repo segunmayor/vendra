@@ -47,5 +47,5 @@ Tested on 11 November 2026: of 6 customers racing for 3 units, exactly 3 succeed
 ## Left for later steps
 
 - **Step 6:** payment starts from an `awaiting_payment` session and must check that it has not expired. A payment verified after expiry must re-reserve stock or be refunded.
-- **Step 7:** turning a paid session into an order commits the reservation, which reduces on-hand stock, and empties the cart.
+- **Payment (Step 6):** a paid session commits its reservation (reducing on-hand stock), leaves the cart, and records `CheckoutPaid`. **Step 7** places the order from that event: see [orders.md](orders.md).
 - Abandoned guest carts are not yet cleaned up.

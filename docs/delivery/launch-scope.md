@@ -27,8 +27,8 @@ Each step ends with tests passing before the next begins.
 | 3 | Portal sign-in (cookies), catalogue, listings, stock, admin screens (done 11 Nov) | 2 |
 | 4 | Discovery: storefront pages and search on PostgreSQL (done 11 Nov) | 3 |
 | 5 | Cart, checkout, stock reservation (done 11 Nov) | 3 |
-| 6 | Payment: evaluate provider, build adapter, webhook, verification, ledger posting (done 12 Nov, Paystack and Flutterwave, configurable in Admin). Staff MFA and refunds remain | 5, provider test keys |
-| 7 | Orders: created from verified payment | 6 |
+| 6 | Payment: evaluate provider, build adapter, webhook, verification, ledger posting (done 12 Nov, Paystack and Flutterwave, configurable in Admin). Staff MFA and refunds (done 12 Nov) | 5, provider test keys |
+| 7 | Orders: created from verified payment (done 12 Nov, with customer order history, staff order screens and a staff page) | 6 |
 | 8 | Shipping: manual dispatch and customer tracking | 7 |
 | 9 | Vendor registration and verification | 2 |
 | 10 | Security review, end-to-end test, staging, go-live checklist | All |

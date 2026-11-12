@@ -3,17 +3,21 @@ import { APP_GUARD } from '@nestjs/core';
 import { ENV, Env } from '../../platform/config/env';
 import { PrismaService } from '../../platform/prisma/prisma.service';
 import { SettingsReader } from '../settings';
+import { createSealer } from '../../platform/crypto/sealer';
 import { AuthService } from './application/auth.service';
+import { MfaService } from './application/mfa.service';
 import { Clock } from './application/ports';
 import { StaffService } from './application/staff.service';
 import {
   PrismaAccountRepository,
   PrismaAuditTrail,
   PrismaLoginThrottle,
+  PrismaMfaRepository,
   PrismaRoleRepository,
   PrismaSessionRepository,
 } from './infrastructure/prisma.adapters';
 import { Argon2PasswordHasher, JwtAccessTokenService, NodeSecrets } from './infrastructure/security.adapters';
+import { RandomRecoveryCodes, RfcTotp } from './infrastructure/totp';
 import { AuthGuard } from './interface/auth.guard';
 import { authControllers } from './interface/auth.controllers';
 import { StaffController } from './interface/staff.controller';
@@ -24,9 +28,25 @@ const clock: Clock = { now: () => new Date() };
   controllers: [...authControllers, StaffController],
   providers: [
     {
-      provide: AuthService,
+      provide: MfaService,
       inject: [PrismaService, ENV, SettingsReader],
       useFactory: (prisma: PrismaService, env: Env, settings: SettingsReader) =>
+        new MfaService(
+          new PrismaMfaRepository(prisma),
+          new RfcTotp(),
+          createSealer(env.SETTINGS_ENCRYPTION_KEY, 'two-step sign-in secrets'),
+          new NodeSecrets(),
+          new RandomRecoveryCodes(),
+          new PrismaLoginThrottle(prisma),
+          new PrismaAuditTrail(prisma),
+          settings,
+          clock,
+        ),
+    },
+    {
+      provide: AuthService,
+      inject: [PrismaService, ENV, SettingsReader, MfaService],
+      useFactory: (prisma: PrismaService, env: Env, settings: SettingsReader, mfa: MfaService) =>
         new AuthService(
           new PrismaAccountRepository(prisma),
           new PrismaSessionRepository(prisma),
@@ -37,6 +57,7 @@ const clock: Clock = { now: () => new Date() };
           new PrismaAuditTrail(prisma),
           clock,
           settings,
+          mfa,
         ),
     },
     {
@@ -55,6 +76,6 @@ const clock: Clock = { now: () => new Date() };
     },
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
-  exports: [AuthService, StaffService],
+  exports: [AuthService, StaffService, MfaService],
 })
 export class IdentityModule {}

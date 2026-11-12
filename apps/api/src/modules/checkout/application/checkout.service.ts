@@ -1,4 +1,4 @@
-import { ApplicationError, DomainError, Money, Principal } from '../../../shared-kernel';
+import { ApplicationError, DomainEvent, DomainError, Money, Principal } from '../../../shared-kernel';
 import { CartPricing, CartService, CURRENCY } from '../../cart';
 import { InsufficientStock, InventoryCommands } from '../../inventory';
 import { SettingsReader } from '../../settings';
@@ -13,7 +13,8 @@ export interface CheckoutRepository {
   /** Throws DuplicateCheckout when this customer already used the idempotency key. */
   insert(session: CheckoutSession): Promise<void>;
   /** Throws ConcurrencyConflict if the session changed since it was read. */
-  update(session: CheckoutSession): Promise<void>;
+  /** Saves the session, and any events, in one transaction. */
+  update(session: CheckoutSession, events?: readonly DomainEvent[]): Promise<void>;
 }
 
 export class DuplicateCheckout extends Error {}
@@ -158,6 +159,14 @@ export class CheckoutService {
    * re-reserving it first if the hold lapsed while the customer was paying. If the stock has
    * since sold, the session is still marked paid, flagged for staff to refund.
    */
+  /** For orders: a paid checkout, exactly as the customer agreed to it. Null if it is not paid. */
+  async paidCheckout(checkoutId: string): Promise<PaidCheckout | null> {
+    const session = await this.sessions.findById(checkoutId);
+    if (!session || session.snapshot.status !== 'paid' || !session.snapshot.paymentId) return null;
+    const { id, customerId, lines, address, subtotal, delivery, total, paymentId, stockIssue } = session.snapshot;
+    return { id, customerId, lines, address, subtotal, delivery, total, paymentId, stockIssue: stockIssue ?? false };
+  }
+
   async markPaid(checkoutId: string, paymentId: string): Promise<void> {
     const session = await this.sessions.findById(checkoutId);
     if (!session) throw new Error(`Paid checkout ${checkoutId} not found`);
@@ -179,7 +188,17 @@ export class CheckoutService {
       }
       if (!stockIssue) await this.inventory.commit(checkoutId);
     }
-    if (session.markPaid(paymentId, stockIssue)) await this.sessions.update(session);
+    if (session.markPaid(paymentId, stockIssue)) {
+      // Orders are placed from this event, committed with the paid status, so neither can happen without the other.
+      await this.sessions.update(session, [
+        {
+          type: 'CheckoutPaid',
+          aggregateId: checkoutId,
+          occurredAt: this.clock.now(),
+          payload: { checkoutId, customerId: session.snapshot.customerId, paymentId, stockIssue },
+        },
+      ]);
+    }
     // The purchased items leave the basket; anything added since stays.
     await this.carts.removePurchased(session.snapshot.customerId, lines);
   }
@@ -209,4 +228,17 @@ export class CheckoutService {
 
 export { CURRENCY };
 export { CheckoutSession } from '../domain/checkout-session';
-export type { CheckoutStatus, DeliveryAddress } from '../domain/checkout-session';
+export type { CheckoutLine, CheckoutStatus, DeliveryAddress } from '../domain/checkout-session';
+
+export interface PaidCheckout {
+  readonly id: string;
+  readonly customerId: string;
+  readonly lines: readonly CheckoutLine[];
+  readonly address: DeliveryAddress;
+  readonly subtotal: Money;
+  readonly delivery: Money;
+  readonly total: Money;
+  readonly paymentId: string;
+  /** Paid, but the stock could not be secured. */
+  readonly stockIssue: boolean;
+}

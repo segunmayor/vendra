@@ -5,9 +5,11 @@ import type { AddressInfo } from 'node:net';
 import { createApp } from '../../src/bootstrap';
 import { StaffService } from '../../src/modules/identity';
 import { PERMISSIONS } from '../../src/modules/identity/domain/permissions';
+import { OrderService } from '../../src/modules/orders';
 import { OutboxRunner } from '../../src/platform/outbox/outbox-runner';
 import { Principal } from '../../src/shared-kernel';
 import { FakeGateway } from './fake-gateway';
+import { verifiedStaffToken } from './staff-mfa';
 
 const prisma = new PrismaClient();
 const PASSWORD = 'a-long-enough-password';
@@ -51,7 +53,7 @@ async function staffToken(permissions: readonly string[]): Promise<string> {
   const role = await staff.createRole(root, `role_${randomUUID()}`, permissions);
   const email = `staff_${randomUUID()}@example.com`;
   await staff.createStaff(root, email, PASSWORD, [role.id]);
-  return (await call('POST', 'admin/auth/login', { body: { email, password: PASSWORD } })).body.accessToken;
+  return verifiedStaffToken(call, email, PASSWORD);
 }
 
 async function customer(): Promise<{ token: string; email: string }> {
@@ -346,6 +348,8 @@ describe('paying with Paystack', () => {
     fake.transactions.set(reference, { status: 'success', amount: 2750000, currency: 'NGN', id: txId() });
     expect(ok(await call('POST', `store/payments/${reference}/verify`, { token })).status).toBe('succeeded');
     expect(await prisma.checkoutSession.findUniqueOrThrow({ where: { id: checkout.id } })).toMatchObject({ status: 'paid', stockIssue: true });
+    // The order is still placed, flagged so staff refund it.
+    expect(ok(await call('GET', `store/orders/by-checkout/${checkout.id}`, { token })).status).toBe('stock_issue');
   });
 
   it('refuses to start payment for an expired checkout, someone else\'s, or a disabled gateway', async () => {
@@ -384,6 +388,210 @@ describe('paying with Flutterwave', () => {
     expect((await call('POST', `webhooks/payments/${flutterwaveId}`, { raw, headers: { 'verif-hash': 'wrong-hash-value-xxxxxxxxxxxxxxx' } })).status).toBe(401);
     ok(await call('POST', `webhooks/payments/${flutterwaveId}`, { raw, headers: { 'verif-hash': FLW_HASH } }));
     expect(ok(await call('GET', `store/checkout/${checkout.id}`, { token })).status).toBe('paid');
+  });
+});
+
+describe('refunds', () => {
+  let refunder: string;
+
+  beforeAll(async () => {
+    refunder = await staffToken(['payments.read', 'orders.refund']);
+  });
+
+  /** A checkout of 27,500 naira, paid through the given gateway. */
+  async function paid(gatewayId = paystackId) {
+    const { token, checkout } = await openCheckout(2);
+    const { reference } = ok(await call('POST', `store/checkout/${checkout.id}/payments`, { token, body: { gatewayId } }), 201);
+    const amount = gatewayId === paystackId ? 2750000 : 27500;
+    fake.transactions.set(reference, { status: gatewayId === paystackId ? 'success' : 'successful', amount, currency: 'NGN', id: txId() });
+    expect(ok(await call('POST', `store/payments/${reference}/verify`, { token })).status).toBe('succeeded');
+    const payment = await prisma.payment.findUniqueOrThrow({ where: { reference } });
+    return { id: payment.id, reference, transactionId: fake.transactions.get(reference)!.id };
+  }
+  const refund = (paymentId: string, amountMinor: string, token = refunder) =>
+    call('POST', `admin/payments/${paymentId}/refunds`, { token, body: { amountMinor, reason: 'Customer returned one item' } });
+  const detail = async (paymentId: string) => ok(await call('GET', `admin/payments/${paymentId}`, { token: refunder }));
+
+  it('holds part of a Paystack payment, counts it once the gateway confirms, and records it in the ledger', async () => {
+    const payment = await paid();
+    const sent = ok(await refund(payment.id, '1000000'), 201);
+    expect(sent).toMatchObject({ status: 'submitted', amountMinor: '1000000', gatewayStatus: 'pending' });
+    expect(fake.calls('/paystack/refund').at(-1)!.body).toEqual({ transaction: payment.reference, amount: 1000000, currency: 'NGN', merchant_note: 'Customer returned one item' });
+
+    expect(await detail(payment.id)).toMatchObject({ status: 'succeeded', refundedMinor: '0', refundPendingMinor: '1000000', refundableMinor: '1750000' });
+    expect(ok(await call('POST', `admin/refunds/${sent.id}/check`, { token: refunder })).status).toBe('submitted');
+
+    fake.refunds.set(Number(sent.providerRefundId), 'processed');
+    expect(ok(await call('POST', `admin/refunds/${sent.id}/check`, { token: refunder })).status).toBe('succeeded');
+    expect(await detail(payment.id)).toMatchObject({ status: 'partially_refunded', refundedMinor: '1000000', refundPendingMinor: '0', refundableMinor: '1750000' });
+
+    const entries = await prisma.journalEntry.findMany({ where: { sourceType: 'refund_paid', sourceId: sent.id }, include: { lines: true } });
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.lines.map((line) => [line.accountCode, line.side, line.amountMinor])).toEqual(
+      expect.arrayContaining([
+        ['2100', 'debit', 1000000n],
+        ['1100', 'credit', 1000000n],
+      ]),
+    );
+    // Checking again changes nothing and posts nothing twice.
+    ok(await call('POST', `admin/refunds/${sent.id}/check`, { token: refunder }));
+    await app.get(OutboxRunner).drain();
+    expect(await prisma.journalEntry.count({ where: { sourceType: 'refund_paid', sourceId: sent.id } })).toBe(1);
+    expect(await prisma.auditLog.count({ where: { action: 'payments.refund_requested', targetId: payment.id } })).toBe(1);
+  });
+
+  it('never returns more than was paid, even when two refunds are sent at once', async () => {
+    const payment = await paid();
+    const replies = await Promise.all([refund(payment.id, '2000000'), refund(payment.id, '2000000')]);
+    expect(replies.map((reply) => reply.status).sort()).toEqual([201, expect.any(Number)]);
+    expect([409, 422]).toContain(replies.find((reply) => reply.status !== 201)!.status);
+    const row = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+    expect(row.refundedMinor + row.refundPendingMinor).toBe(2000000n);
+    expect((await refund(payment.id, '750001')).status).toBe(422);
+    expect(ok(await refund(payment.id, '750000'), 201).status).toBe('submitted');
+  });
+
+  it('refunds a whole Flutterwave payment without naming an amount, and completes it at once', async () => {
+    const payment = await paid(flutterwaveId);
+    const sent = ok(await refund(payment.id, '2750000'), 201);
+    expect(sent.status).toBe('succeeded');
+    const request = fake.calls(`/flutterwave/transactions/${payment.transactionId}/refund`).at(-1)!;
+    expect(request.body).toEqual({ comments: 'Customer returned one item' });
+    expect(await detail(payment.id)).toMatchObject({ status: 'refunded', refundedMinor: '2750000', refundableMinor: '0' });
+  });
+
+  it('sends part refunds to Flutterwave in whole naira, and refuses kobo', async () => {
+    const payment = await paid(flutterwaveId);
+    const kobo = ok(await refund(payment.id, '150'), 201);
+    expect(kobo).toMatchObject({ status: 'failed', failureReason: expect.stringContaining('whole naira') });
+    expect((await detail(payment.id)).refundableMinor).toBe('2750000');
+    ok(await refund(payment.id, '500000'), 201);
+    expect(fake.calls(`/flutterwave/transactions/${payment.transactionId}/refund`).at(-1)!.body).toEqual({ amount: 5000, comments: 'Customer returned one item' });
+  });
+
+  it('frees the money when the gateway refuses', async () => {
+    const payment = await paid();
+    fake.refundFailure = 'reject';
+    const sent = ok(await refund(payment.id, '1000000'), 201);
+    expect(sent).toMatchObject({ status: 'failed', failureReason: expect.stringContaining('fully reversed') });
+    expect(await detail(payment.id)).toMatchObject({ status: 'succeeded', refundPendingMinor: '0', refundableMinor: '2750000' });
+  });
+
+  it('keeps the money held when the outcome is unknown, until staff record what the dashboard shows', async () => {
+    const payment = await paid();
+    fake.refundFailure = 'drop';
+    const sent = ok(await refund(payment.id, '1000000'), 201);
+    expect(sent.status).toBe('unknown');
+    expect((await detail(payment.id)).refundableMinor).toBe('1750000');
+    expect((await call('POST', `admin/refunds/${sent.id}/check`, { token: refunder })).body.code).toBe('refund.check_dashboard');
+
+    const resolve = (outcome: string, note: string) => call('POST', `admin/refunds/${sent.id}/resolve`, { token: refunder, body: { outcome, note } });
+    expect((await resolve('failed', '')).status).toBe(422);
+    expect(ok(await resolve('failed', 'Not listed on the Paystack dashboard')).status).toBe('failed');
+    expect((await detail(payment.id)).refundableMinor).toBe('2750000');
+    expect((await resolve('succeeded', 'Changed my mind')).status).toBe(422);
+    expect(await prisma.auditLog.count({ where: { action: 'payments.refund_resolved', targetId: sent.id } })).toBe(1);
+  });
+
+  it('needs orders.refund and a session verified with two-step sign-in', async () => {
+    const payment = await paid();
+    const viewer = await staffToken(['payments.read']);
+    expect((await refund(payment.id, '100', viewer)).status).toBe(403);
+
+    const staff = app.get(StaffService);
+    const root: Principal = { accountId: randomUUID(), sessionId: randomUUID(), audience: 'admin', permissions: PERMISSIONS };
+    const role = await staff.createRole(root, `role_${randomUUID()}`, ['payments.read', 'orders.refund']);
+    const email = `staff_${randomUUID()}@example.com`;
+    await staff.createStaff(root, email, PASSWORD, [role.id]);
+    const unverified = (await call('POST', 'admin/auth/login', { body: { email, password: PASSWORD } })).body.accessToken;
+    const refused = await refund(payment.id, '100', unverified);
+    expect(refused).toMatchObject({ status: 403, body: { code: 'auth.mfa_required' } });
+    expect(await prisma.refund.count({ where: { paymentId: payment.id } })).toBe(0);
+  });
+
+  it('refuses to refund a payment that has not succeeded', async () => {
+    const { token, checkout } = await openCheckout(1);
+    const { reference } = ok(await call('POST', `store/checkout/${checkout.id}/payments`, { token, body: { gatewayId: paystackId } }), 201);
+    const payment = await prisma.payment.findUniqueOrThrow({ where: { reference } });
+    expect((await refund(payment.id, '100')).body).toMatchObject({ status: 422, code: 'payment.not_refundable' });
+  });
+});
+
+describe('orders', () => {
+  let clerk: string;
+
+  beforeAll(async () => {
+    clerk = await staffToken(['orders.manage']);
+  });
+
+  async function paidOrder() {
+    const shopper = await openCheckout(2);
+    const { reference } = ok(await call('POST', `store/checkout/${shopper.checkout.id}/payments`, { token: shopper.token, body: { gatewayId: paystackId } }), 201);
+    fake.transactions.set(reference, { status: 'success', amount: 2750000, currency: 'NGN', id: txId() });
+    ok(await call('POST', `store/payments/${reference}/verify`, { token: shopper.token }));
+    return { ...shopper, reference };
+  }
+
+  it('places an order from a paid checkout, at the agreed prices, by the time the customer is back', async () => {
+    const { token, checkout, listingId, email, reference } = await paidOrder();
+    const order = ok(await call('GET', `store/orders/by-checkout/${checkout.id}`, { token }));
+    expect(order).toMatchObject({
+      status: 'placed',
+      number: expect.stringMatching(/^\d{6,}$/),
+      subtotal: { amountMinor: '2500000', currency: 'NGN' },
+      delivery: { amountMinor: '250000' },
+      total: { amountMinor: '2750000' },
+      itemCount: 2,
+      lineCount: 1,
+      address: { recipient: 'Ada Obi', phone: '+2348031234567', city: 'Ikeja', state: 'Lagos' },
+    });
+    expect(order.sellerOrders).toHaveLength(1);
+    expect(order.sellerOrders[0]).toMatchObject({ status: 'pending', lines: [{ listingId, quantity: 2, unitPrice: { amountMinor: '1250000' }, lineTotal: { amountMinor: '2500000' } }] });
+
+    const row = await prisma.payment.findUniqueOrThrow({ where: { reference } });
+    const mine = ok(await call('GET', 'store/orders', { token }));
+    expect(mine.map((entry: { id: string }) => entry.id)).toEqual([order.id]);
+    expect(ok(await call('GET', `store/orders/${order.id}`, { token })).number).toBe(order.number);
+
+    const staffView = ok(await call('GET', `admin/orders/${order.id}`, { token: clerk }));
+    expect(staffView).toMatchObject({ paymentId: row.id, checkoutId: checkout.id, customerEmail: email });
+    expect(ok(await call('GET', `admin/orders?number=${order.number}`, { token: clerk })).map((entry: { id: string }) => entry.id)).toEqual([order.id]);
+    expect(ok(await call('GET', 'admin/orders?status=placed', { token: clerk })).some((entry: { id: string }) => entry.id === order.id)).toBe(true);
+    expect(ok(await call('GET', 'admin/orders/counts', { token: clerk })).byStatus.placed).toBeGreaterThanOrEqual(1);
+  });
+
+  it('places one order however often the paid event is delivered', async () => {
+    const { checkout } = await paidOrder();
+    const orders = app.get(OrderService);
+    const [a, b] = await Promise.all([orders.placeFromCheckout(checkout.id), orders.placeFromCheckout(checkout.id)]);
+    expect(a.snapshot.id).toBe(b.snapshot.id);
+    expect(await prisma.order.count({ where: { checkoutId: checkout.id } })).toBe(1);
+    await prisma.outboxEvent.updateMany({ where: { type: 'CheckoutPaid', aggregateId: checkout.id }, data: { publishedAt: null, attempts: 0 } });
+    await app.get(OutboxRunner).drain();
+    expect(await prisma.order.count({ where: { checkoutId: checkout.id } })).toBe(1);
+  });
+
+  it('shows customers only their own orders', async () => {
+    const { checkout } = await paidOrder();
+    const order = await prisma.order.findUniqueOrThrow({ where: { checkoutId: checkout.id } });
+    const stranger = await customer();
+    expect((await call('GET', `store/orders/${order.id}`, { token: stranger.token })).status).toBe(404);
+    expect((await call('GET', `store/orders/by-checkout/${checkout.id}`, { token: stranger.token })).status).toBe(404);
+    expect(ok(await call('GET', 'store/orders', { token: stranger.token }))).toEqual([]);
+  });
+
+  it('places no order for an unpaid checkout or a payment of the wrong amount', async () => {
+    const { token, checkout } = await openCheckout(1);
+    const { reference } = ok(await call('POST', `store/checkout/${checkout.id}/payments`, { token, body: { gatewayId: paystackId } }), 201);
+    expect((await call('GET', `store/orders/by-checkout/${checkout.id}`, { token })).status).toBe(404);
+    fake.transactions.set(reference, { status: 'success', amount: 100, currency: 'NGN', id: txId() });
+    expect(ok(await call('POST', `store/payments/${reference}/verify`, { token })).status).toBe('requires_review');
+    expect(await prisma.order.count({ where: { checkoutId: checkout.id } })).toBe(0);
+  });
+
+  it('needs orders.manage for staff', async () => {
+    const viewer = await staffToken(['payments.read']);
+    expect((await call('GET', 'admin/orders', { token: viewer })).status).toBe(403);
   });
 });
 

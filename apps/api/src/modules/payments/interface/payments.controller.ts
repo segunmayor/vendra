@@ -2,13 +2,14 @@ import { Body, Controller, Get, HttpCode, Param, Post, Put, Query, Req } from '@
 import { ApiBearerAuth, ApiCreatedResponse, ApiExcludeEndpoint, ApiOkResponse, ApiOperation, ApiProperty, ApiPropertyOptional, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { z } from 'zod';
-import { CurrentPrincipal, Public, RequirePermission, Surface } from '../../../platform/http/auth.decorators';
+import { CurrentPrincipal, Public, RequireMfa, RequirePermission, Surface } from '../../../platform/http/auth.decorators';
 import { ZodPipe } from '../../../platform/http/zod.pipe';
 import { ApplicationError, Principal } from '../../../shared-kernel';
 import { SettingsReader } from '../../settings';
 import { GATEWAY_TYPES, GatewayService, GatewayState } from '../application/gateways';
 import { PaymentService } from '../application/payment.service';
 import { InvalidWebhookSignature, ProviderUnavailable } from '../application/ports';
+import { PaymentDetail, RefundService, RefundView } from '../application/refunds';
 
 const uuid = new ZodPipe(z.uuid());
 const reference = new ZodPipe(z.string().regex(/^[A-Za-z0-9]{6,40}$/));
@@ -22,6 +23,11 @@ const gatewaySchema = z.object({
 });
 const createSchema = gatewaySchema.extend({ type: z.string().max(40) });
 const startSchema = z.object({ gatewayId: z.uuid() });
+const refundSchema = z.object({
+  amountMinor: z.string().regex(/^[1-9]\d{0,15}$/, 'Enter the amount in kobo, as whole digits'),
+  reason: z.string().max(500),
+});
+const resolveSchema = z.object({ outcome: z.enum(['succeeded', 'failed']), note: z.string().max(300) });
 const listSchema = z.object({ status: z.enum(['initiated', 'succeeded', 'failed', 'requires_review', 'partially_refunded', 'refunded']).optional() });
 
 class FieldDto {
@@ -84,6 +90,57 @@ export class PaymentListItem {
   @ApiProperty() createdAt!: Date;
 }
 
+export class RefundResponse {
+  @ApiProperty() id!: string;
+  @ApiProperty() paymentId!: string;
+  @ApiProperty() amountMinor!: string;
+  @ApiProperty() currency!: string;
+  @ApiProperty() reason!: string;
+  @ApiProperty() requestedBy!: string;
+  @ApiProperty({ enum: ['pending', 'submitted', 'succeeded', 'failed', 'unknown'] }) status!: string;
+  @ApiPropertyOptional({ type: String, nullable: true }) providerRefundId!: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) gatewayStatus!: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) failureReason!: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) resolvedBy!: string | null;
+  @ApiProperty() createdAt!: Date;
+}
+
+export class PaymentDetailResponse {
+  @ApiProperty() id!: string;
+  @ApiProperty() reference!: string;
+  @ApiProperty() checkoutId!: string;
+  @ApiProperty() provider!: string;
+  @ApiPropertyOptional({ type: String, nullable: true }) gatewayId!: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) providerTransactionId!: string | null;
+  @ApiProperty({ enum: ['initiated', 'succeeded', 'failed', 'requires_review', 'partially_refunded', 'refunded'] }) status!: string;
+  @ApiProperty() amountMinor!: string;
+  @ApiProperty({ description: 'Confirmed returned to the customer' }) refundedMinor!: string;
+  @ApiProperty({ description: 'In refunds the gateway has not confirmed yet' }) refundPendingMinor!: string;
+  @ApiProperty() refundableMinor!: string;
+  @ApiProperty() currency!: string;
+  @ApiProperty({ type: [RefundResponse] }) refunds!: RefundResponse[];
+}
+
+export class RefundDto {
+  @ApiProperty({ description: 'In kobo, as a string of digits' }) amountMinor!: string;
+  @ApiProperty() reason!: string;
+}
+
+export class ResolveRefundDto {
+  @ApiProperty({ enum: ['succeeded', 'failed'] }) outcome!: 'succeeded' | 'failed';
+  @ApiProperty({ description: 'What the gateway dashboard shows' }) note!: string;
+}
+
+const refundResponse = (refund: RefundView): RefundResponse => ({ ...refund, amountMinor: refund.amountMinor.toString() });
+const detailResponse = (detail: PaymentDetail): PaymentDetailResponse => ({
+  ...detail,
+  amountMinor: detail.amountMinor.toString(),
+  refundedMinor: detail.refundedMinor.toString(),
+  refundPendingMinor: detail.refundPendingMinor.toString(),
+  refundableMinor: detail.refundableMinor.toString(),
+  refunds: detail.refunds.map(refundResponse),
+});
+
 export class PaymentOptionResponse {
   @ApiProperty() id!: string;
   @ApiProperty() name!: string;
@@ -144,6 +201,7 @@ export class GatewaysController {
   }
 
   @Post()
+  @RequireMfa()
   @ApiOperation({ operationId: 'adminCreateGateway' })
   @ApiCreatedResponse({ type: GatewayResponse })
   async create(@CurrentPrincipal() actor: Principal, @Body(new ZodPipe(createSchema)) body: CreateGatewayDto): Promise<GatewayResponse> {
@@ -152,6 +210,7 @@ export class GatewaysController {
   }
 
   @Put(':id')
+  @RequireMfa()
   @ApiOperation({ operationId: 'adminUpdateGateway' })
   @ApiOkResponse({ type: GatewayResponse })
   async update(@CurrentPrincipal() actor: Principal, @Param('id', uuid) id: string, @Body(new ZodPipe(gatewaySchema)) body: GatewayDto): Promise<GatewayResponse> {
@@ -179,7 +238,10 @@ export class GatewaysController {
 @RequirePermission('payments.read')
 @Controller({ path: 'admin/payments', version: '1' })
 export class AdminPaymentsController {
-  constructor(private readonly payments: PaymentService) {}
+  constructor(
+    private readonly payments: PaymentService,
+    private readonly refunds: RefundService,
+  ) {}
 
   @Get()
   @ApiOperation({ operationId: 'adminListPayments' })
@@ -187,6 +249,48 @@ export class AdminPaymentsController {
   @ApiOkResponse({ type: [PaymentListItem] })
   async list(@Query(new ZodPipe(listSchema)) query: z.infer<typeof listSchema>): Promise<PaymentListItem[]> {
     return (await this.payments.recent(query.status)).map((row) => ({ ...row, amountMinor: row.amountMinor.toString() }));
+  }
+
+  @Get(':id')
+  @ApiOperation({ operationId: 'adminGetPayment' })
+  @ApiOkResponse({ type: PaymentDetailResponse })
+  async get(@Param('id', uuid) id: string): Promise<PaymentDetailResponse> {
+    return detailResponse(await this.refunds.detail(id));
+  }
+
+  @Post(':id/refunds')
+  @RequirePermission('orders.refund')
+  @RequireMfa()
+  @ApiOperation({ operationId: 'adminRefundPayment', summary: 'Returns money through the gateway the customer paid with' })
+  @ApiCreatedResponse({ type: RefundResponse })
+  async refund(@CurrentPrincipal() actor: Principal, @Param('id', uuid) id: string, @Body(new ZodPipe(refundSchema)) body: RefundDto): Promise<RefundResponse> {
+    return refundResponse(await this.refunds.request(actor, id, BigInt(body.amountMinor), body.reason));
+  }
+}
+
+@ApiTags('admin payments')
+@ApiBearerAuth()
+@Surface('admin')
+@RequirePermission('orders.refund')
+@Controller({ path: 'admin/refunds', version: '1' })
+export class AdminRefundsController {
+  constructor(private readonly refunds: RefundService) {}
+
+  @Post(':id/check')
+  @HttpCode(200)
+  @ApiOperation({ operationId: 'adminCheckRefund', summary: 'Asks the gateway how the refund is going' })
+  @ApiOkResponse({ type: RefundResponse })
+  async check(@Param('id', uuid) id: string): Promise<RefundResponse> {
+    return refundResponse(await this.refunds.check(id));
+  }
+
+  @Post(':id/resolve')
+  @HttpCode(200)
+  @RequireMfa()
+  @ApiOperation({ operationId: 'adminResolveRefund', summary: 'Records what the gateway dashboard shows for a refund in doubt' })
+  @ApiOkResponse({ type: RefundResponse })
+  async resolve(@CurrentPrincipal() actor: Principal, @Param('id', uuid) id: string, @Body(new ZodPipe(resolveSchema)) body: ResolveRefundDto): Promise<RefundResponse> {
+    return refundResponse(await this.refunds.resolve(actor, id, body.outcome, body.note));
   }
 }
 

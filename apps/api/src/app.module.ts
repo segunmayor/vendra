@@ -9,6 +9,7 @@ import { CheckoutModule } from './modules/checkout/checkout.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
+import { OrdersModule } from './modules/orders/orders.module';
 import { ListingsModule } from './modules/listings/listings.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { SettingsModule } from './modules/settings/settings.module';
@@ -16,7 +17,7 @@ import { LogisticsModule } from './modules/logistics/logistics.module';
 import { StorefrontModule } from './modules/storefront/storefront.module';
 
 @Module({
-  imports: [PlatformModule, SettingsModule, IdentityModule, CatalogueModule, ListingsModule, InventoryModule, StorefrontModule, CartModule, LogisticsModule, CheckoutModule, PaymentsModule, LedgerModule],
+  imports: [PlatformModule, SettingsModule, IdentityModule, CatalogueModule, ListingsModule, InventoryModule, StorefrontModule, CartModule, LogisticsModule, CheckoutModule, PaymentsModule, LedgerModule, OrdersModule],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: ProblemDetailsFilter }],
 })

@@ -1,6 +1,5 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { appendAudit } from '../../../platform/audit/audit';
-import { SecretBox } from '../../../platform/crypto/secret-box';
 import { ApplicationError, AuditEntry, ConcurrencyConflict } from '../../../shared-kernel';
 import type { GatewayMode, GatewayRepository, GatewayState, ProviderFactory, SecretSealer } from '../application/gateways';
 import type { PaymentProviderPort } from '../application/ports';
@@ -61,18 +60,6 @@ export class PrismaGatewayRepository implements GatewayRepository {
 }
 
 /** Without SETTINGS_ENCRYPTION_KEY, credentials cannot be saved or read; everything else still works. */
-export function createSealer(key: string | undefined): SecretSealer {
-  if (key) return new SecretBox(key);
-  const missing = () => {
-    throw new ApplicationError(
-      'unavailable',
-      'settings.no_encryption_key',
-      'The server has no SETTINGS_ENCRYPTION_KEY, so gateway credentials cannot be saved or used. Ask whoever runs the server to set it.',
-    );
-  };
-  return { seal: missing, open: missing };
-}
-
 export class GatewayProviderFactory implements ProviderFactory {
   create(type: string, config: Readonly<Record<string, string>>, secrets: Readonly<Record<string, string>>): PaymentProviderPort {
     switch (type) {

@@ -23,6 +23,8 @@ Create the first administrator once, after building the API:
 ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a-long-password' pnpm --filter @vendra/api admin:create
 ```
 
+On first sign-in Admin asks them to set up two-step sign-in with an authenticator app. This needs `SETTINGS_ENCRYPTION_KEY` to be set (see `.env.example`).
+
 ## Checks
 
 ```bash

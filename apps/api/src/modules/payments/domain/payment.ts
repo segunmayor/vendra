@@ -28,7 +28,10 @@ export interface PaymentState {
   readonly amount: Money;
   readonly status: PaymentStatus;
   readonly providerTransactionId: string | null;
+  /** Money confirmed returned to the customer. */
   readonly refunded: Money;
+  /** Money in refunds the gateway has not yet confirmed. */
+  readonly refundPending: Money;
   readonly version: number;
 }
 
@@ -57,6 +60,7 @@ export class Payment extends AggregateRoot {
       status: 'initiated',
       providerTransactionId: null,
       refunded: Money.zero(input.amount.currency),
+      refundPending: Money.zero(input.amount.currency),
       version: 0,
     });
   }
@@ -120,32 +124,49 @@ export class Payment extends AggregateRoot {
     this.emit('PaymentSucceeded', now, result);
   }
 
-  recordRefund(amount: Money, now: Date): void {
+  /** What can still be refunded: paid, less refunds made or in progress. */
+  get refundable(): Money {
+    return this.state.amount.subtract(this.state.refunded).subtract(this.state.refundPending);
+  }
+
+  /**
+   * Holds back money for a refund before the gateway is asked, so two refunds at once can
+   * never return more than was paid.
+   */
+  reserveRefund(amount: Money): void {
     if (this.state.status !== 'succeeded' && this.state.status !== 'partially_refunded') {
-      throw new DomainError('payment.not_refundable', `Cannot refund a ${this.state.status} payment`);
+      throw new DomainError('payment.not_refundable', `Only a successful payment can be refunded. This one is ${this.state.status.replace('_', ' ')}.`);
     }
-    if (!amount.isPositive()) {
-      throw new DomainError('payment.invalid_refund', 'Refund amount must be positive');
+    if (!amount.isPositive()) throw new DomainError('payment.invalid_refund', 'Refund amount must be positive');
+    if (amount.isGreaterThan(this.refundable)) {
+      throw new DomainError('payment.refund_exceeds_captured', 'Refunds cannot add up to more than the customer paid');
     }
+    this.state = { ...this.state, refundPending: this.state.refundPending.add(amount) };
+  }
+
+  /** The gateway confirmed the money went back. */
+  completeRefund(refundId: string, amount: Money, now: Date): void {
+    this.takeFromPending(amount);
     const refunded = this.state.refunded.add(amount);
-    if (refunded.isGreaterThan(this.state.amount)) {
-      throw new DomainError('payment.refund_exceeds_captured', 'Refunds exceed the captured amount');
-    }
-    this.state = {
-      ...this.state,
-      refunded,
-      status: refunded.equals(this.state.amount) ? 'refunded' : 'partially_refunded',
-    };
+    this.state = { ...this.state, refunded, status: refunded.equals(this.state.amount) ? 'refunded' : 'partially_refunded' };
     this.raise({
       type: 'PaymentRefunded',
       aggregateId: this.state.id,
       occurredAt: now,
-      payload: {
-        checkoutId: this.state.checkoutId,
-        amountMinor: amount.minor.toString(),
-        currency: amount.currency,
-      },
+      payload: { refundId, checkoutId: this.state.checkoutId, amountMinor: amount.minor.toString(), currency: amount.currency },
     });
+  }
+
+  /** The refund did not happen, so the money can be refunded again later. */
+  releaseRefund(amount: Money): void {
+    this.takeFromPending(amount);
+  }
+
+  private takeFromPending(amount: Money): void {
+    if (amount.isGreaterThan(this.state.refundPending)) {
+      throw new DomainError('payment.refund_not_reserved', 'This refund was not reserved on the payment');
+    }
+    this.state = { ...this.state, refundPending: this.state.refundPending.subtract(amount) };
   }
 
   private emit(type: string, now: Date, result: ProviderVerification): void {

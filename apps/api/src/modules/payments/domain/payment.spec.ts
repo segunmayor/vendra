@@ -88,27 +88,51 @@ describe('Payment', () => {
       return payment;
     };
 
-    it('tracks partial then full refunds', () => {
+    it('holds money for a refund, then counts it once the gateway confirms', () => {
       const payment = settled();
-      payment.recordRefund(ngn(4_000n), now);
+      payment.reserveRefund(ngn(4_000n));
+      expect(payment.snapshot.status).toBe('succeeded');
+      expect(payment.refundable.minor).toBe(6_000n);
+      payment.completeRefund('r1', ngn(4_000n), now);
       expect(payment.snapshot.status).toBe('partially_refunded');
-      payment.recordRefund(ngn(6_000n), now);
+      expect(payment.pullEvents()).toEqual([
+        expect.objectContaining({ type: 'PaymentRefunded', payload: expect.objectContaining({ refundId: 'r1', amountMinor: '4000' }) }),
+      ]);
+      payment.reserveRefund(ngn(6_000n));
+      payment.completeRefund('r2', ngn(6_000n), now);
       expect(payment.snapshot.status).toBe('refunded');
+      expect(payment.refundable.minor).toBe(0n);
     });
 
-    it('rejects cumulative refunds above the captured amount', () => {
+    it('counts refunds in progress, so two at once cannot exceed what was paid', () => {
       const payment = settled();
-      payment.recordRefund(ngn(6_000n), now);
-      expect(() => payment.recordRefund(ngn(4_001n), now)).toThrow('exceed');
-      expect(payment.snapshot.refunded.minor).toBe(6_000n);
+      payment.reserveRefund(ngn(6_000n));
+      expect(() => payment.reserveRefund(ngn(4_001n))).toThrow('more than the customer paid');
+      payment.reserveRefund(ngn(4_000n));
+      expect(payment.refundable.minor).toBe(0n);
     });
 
-    it('rejects refunding an unpaid payment', () => {
-      expect(() => newPayment().recordRefund(ngn(1n), now)).toThrow('Cannot refund');
+    it('frees the money again when a refund fails', () => {
+      const payment = settled();
+      payment.reserveRefund(ngn(10_000n));
+      payment.releaseRefund(ngn(10_000n));
+      expect(payment.refundable.minor).toBe(10_000n);
+      expect(payment.snapshot.status).toBe('succeeded');
+      expect(payment.pullEvents()).toEqual([]);
+    });
+
+    it('refuses to settle a refund that was never held', () => {
+      expect(() => settled().completeRefund('r', ngn(1n), now)).toThrow('not reserved');
+      expect(() => settled().releaseRefund(ngn(1n))).toThrow('not reserved');
+    });
+
+    it.each(['initiated', 'requires_review', 'failed'])('rejects refunding a payment that is %s', (status) => {
+      const payment = Payment.rehydrate({ ...newPayment().snapshot, status: status as never });
+      expect(() => payment.reserveRefund(ngn(1n))).toThrow('Only a successful payment');
     });
 
     it('rejects a zero refund', () => {
-      expect(() => settled().recordRefund(ngn(0n), now)).toThrow('positive');
+      expect(() => settled().reserveRefund(ngn(0n))).toThrow('positive');
     });
   });
 });

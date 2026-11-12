@@ -9,6 +9,8 @@ import { StaffService } from '../../src/modules/identity';
 import { PERMISSIONS } from '../../src/modules/identity/domain/permissions';
 import { PrismaService } from '../../src/platform/prisma/prisma.service';
 import { Principal } from '../../src/shared-kernel';
+import { SettingsService } from '../../src/modules/settings/application/settings';
+import { enrolMfa, totpCode } from './staff-mfa';
 
 // Exercises the real HTTP stack and database. Rows use random emails and are left in place.
 const prisma = new PrismaClient();
@@ -58,7 +60,9 @@ async function makeStaff(permissions: readonly string[]) {
   const { id } = await staff.createStaff(root, address, PASSWORD, [role.id]);
   const session = await login('admin', address);
   expect(session.status).toBe(200);
-  return { id, email: address, role, token: session.body.accessToken as string };
+  const token = session.body.accessToken as string;
+  const { secret, recoveryCodes } = await enrolMfa(call, token);
+  return { id, email: address, role, token, secret, recoveryCodes };
 }
 
 beforeAll(async () => {
@@ -163,7 +167,7 @@ describe('registration', () => {
     const row = await prisma.account.findUniqueOrThrow({ where: { id: body.accountId } });
     expect(row.passwordHash.startsWith('$argon2id$')).toBe(true);
     const profile = await me('store', body.accessToken);
-    expect(profile.body).toEqual({ id: body.accountId, audience: 'store', email: address, permissions: [] });
+    expect(profile.body).toEqual({ id: body.accountId, audience: 'store', email: address, permissions: [], mfa: { enabled: false, verified: false, setupRequired: false } });
   });
 
   it('stores refresh tokens only as hashes', async () => {
@@ -527,7 +531,7 @@ describe('staff permissions', () => {
     const target = await makeStaff([]);
     await login('admin', target.email, 'wrong-password-here');
     const actions = await prisma.auditLog.findMany({ where: { actorId: target.id }, select: { action: true } });
-    expect(actions.map((a) => a.action).sort()).toEqual(['auth.login', 'auth.login_failed']);
+    expect(actions.map((a) => a.action).sort()).toEqual(['auth.login', 'auth.login_failed', 'auth.mfa_enabled']);
   });
 
   it('paginates the audit log', async () => {
@@ -592,5 +596,166 @@ describe('bootstrap', () => {
     const address = email();
     await expect(staff.bootstrapSuperAdmin(address, PASSWORD)).rejects.toThrow('already exist');
     await expect(prisma.account.count({ where: { email: address } })).resolves.toBe(0);
+  });
+});
+
+describe('staff two-step sign-in', () => {
+  /** A staff member who has signed in with a password but not set up an authenticator app. */
+  async function newStaff(permissions: readonly string[]) {
+    const address = email();
+    const root: Principal = { accountId: randomUUID(), sessionId: randomUUID(), audience: 'admin', permissions: PERMISSIONS };
+    const role = await staff.createRole(root, `role_${randomUUID()}`, permissions);
+    const { id } = await staff.createStaff(root, address, PASSWORD, [role.id]);
+    const session = await login('admin', address);
+    expect(session.status).toBe(200);
+    return { id, email: address, token: session.body.accessToken as string, refreshToken: session.body.refreshToken as string };
+  }
+
+  const setStaffMfaRequired = async (value: boolean) => {
+    const root: Principal = { accountId: randomUUID(), sessionId: randomUUID(), audience: 'admin', permissions: PERMISSIONS, mfa: true };
+    await app.get(SettingsService).update(root, { 'security.staffMfaRequired': value });
+  };
+
+  it('limits staff to setting it up until they have', async () => {
+    const person = await newStaff(['staff.manage']);
+    const blocked = await call('GET', 'admin/staff', { token: person.token });
+    expect(blocked.status).toBe(403);
+    expect(blocked.body.code).toBe('auth.mfa_setup_required');
+    const profile = await me('admin', person.token);
+    expect(profile.status).toBe(200);
+    expect(profile.body.mfa).toEqual({ enabled: false, verified: false, setupRequired: true });
+    expect((await call('GET', 'admin/auth/mfa', { token: person.token })).body).toMatchObject({ enabled: false, verified: false, required: true });
+  });
+
+  it('turns on with a correct code, keeps this session and ends the others', async () => {
+    const person = await newStaff(['staff.manage']);
+    const elsewhere = (await login('admin', person.email)).body.accessToken as string;
+
+    const setup = await call('POST', 'admin/auth/mfa/setup', { token: person.token });
+    expect(setup.status).toBe(200);
+    expect(setup.body.uri).toMatch(/^otpauth:\/\/totp\//);
+    const wrong = await call('POST', 'admin/auth/mfa/confirm', { token: person.token, body: { code: '000000' === totpCode(setup.body.secret) ? '111111' : '000000' } });
+    // 422, not 401: the person is still signed in, so the portal must not send them to the sign-in page.
+    expect(wrong.status).toBe(422);
+    expect(wrong.body.code).toBe('auth.mfa_invalid_code');
+
+    const confirm = await call('POST', 'admin/auth/mfa/confirm', { token: person.token, body: { code: totpCode(setup.body.secret) } });
+    expect(confirm.status).toBe(200);
+    expect(confirm.body.recoveryCodes).toHaveLength(10);
+    expect(new Set(confirm.body.recoveryCodes).size).toBe(10);
+
+    expect((await call('GET', 'admin/staff', { token: person.token })).status).toBe(200);
+    expect((await me('admin', elsewhere)).status).toBe(401);
+    expect((await me('admin', person.token)).body.mfa).toEqual({ enabled: true, verified: true, setupRequired: false });
+
+    // The secret is encrypted at rest, and recovery codes are stored only as hashes.
+    const row = await prisma.account.findUniqueOrThrow({ where: { id: person.id } });
+    expect(row.mfaSecret).toMatch(/^v1:/);
+    expect(row.mfaSecret).not.toContain(setup.body.secret);
+    const codes = await prisma.mfaRecoveryCode.findMany({ where: { accountId: person.id } });
+    expect(codes.map((code) => code.codeHash)).not.toContain(confirm.body.recoveryCodes[0]);
+    await expect(prisma.auditLog.count({ where: { action: 'auth.mfa_enabled', targetId: person.id } })).resolves.toBe(1);
+
+    // Once on, it cannot be set up again over the top.
+    expect((await call('POST', 'admin/auth/mfa/setup', { token: person.token })).status).toBe(409);
+  });
+
+  it('asks for a code after the password, and accepts each code only once', async () => {
+    const person = await makeStaff(['staff.manage']);
+    const first = await login('admin', person.email);
+    expect(first.status).toBe(200);
+    expect(first.body).toMatchObject({ mfaRequired: true });
+    expect(first.body.accessToken).toBeUndefined();
+
+    const wrong = await call('POST', 'admin/auth/mfa/verify', { body: { challengeToken: first.body.challengeToken, code: '12345' } });
+    expect(wrong.status).toBe(400);
+    const code = totpCode(person.secret, 1);
+    const verified = await call('POST', 'admin/auth/mfa/verify', { body: { challengeToken: first.body.challengeToken, code } });
+    expect(verified.status).toBe(200);
+    expect((await call('GET', 'admin/staff', { token: verified.body.accessToken })).status).toBe(200);
+
+    // The challenge is single use.
+    expect((await call('POST', 'admin/auth/mfa/verify', { body: { challengeToken: first.body.challengeToken, code } })).status).toBe(401);
+    // The same code on a new challenge is a replay.
+    const second = await login('admin', person.email);
+    const replay = await call('POST', 'admin/auth/mfa/verify', { body: { challengeToken: second.body.challengeToken, code } });
+    expect(replay.status).toBe(401);
+    expect(replay.body.code).toBe('auth.mfa_invalid_code');
+  });
+
+  it('keeps the verified flag when the session is refreshed', async () => {
+    const person = await makeStaff(['staff.manage']);
+    const challenge = await login('admin', person.email);
+    const session = await call('POST', 'admin/auth/mfa/verify', { body: { challengeToken: challenge.body.challengeToken, code: person.recoveryCodes[0] } });
+    const renewed = await refresh('admin', session.body.refreshToken);
+    expect(renewed.status).toBe(200);
+    expect((await call('GET', 'admin/staff', { token: renewed.body.accessToken })).status).toBe(200);
+  });
+
+  it('accepts each recovery code once, in any case and spacing', async () => {
+    const person = await makeStaff([]);
+    const code = person.recoveryCodes[3]!;
+    const one = await login('admin', person.email);
+    const loose = code.toLowerCase().replace(/-/g, ' ');
+    expect((await call('POST', 'admin/auth/mfa/verify', { body: { challengeToken: one.body.challengeToken, code: loose } })).status).toBe(200);
+    const two = await login('admin', person.email);
+    expect((await call('POST', 'admin/auth/mfa/verify', { body: { challengeToken: two.body.challengeToken, code } })).status).toBe(401);
+    expect((await call('GET', 'admin/auth/mfa', { token: person.token })).body.recoveryCodesLeft).toBe(9);
+    await expect(prisma.auditLog.count({ where: { action: 'auth.mfa_recovery_code_used', targetId: person.id } })).resolves.toBe(1);
+  });
+
+  it('ends a challenge after five wrong codes', async () => {
+    const person = await makeStaff([]);
+    const challenge = await login('admin', person.email);
+    const attempt = (code: string) => call('POST', 'admin/auth/mfa/verify', { body: { challengeToken: challenge.body.challengeToken, code } });
+    for (let i = 0; i < 5; i++) expect((await attempt('ZZZZ-ZZZZ-ZZ')).status).toBe(401);
+    const after = await attempt(person.recoveryCodes[0]!);
+    expect(after.status).toBe(401);
+    expect(after.body.code).toBe('auth.mfa_challenge_invalid');
+    // The recovery code was not spent on a dead challenge.
+    expect((await call('GET', 'admin/auth/mfa', { token: person.token })).body.recoveryCodesLeft).toBe(10);
+  });
+
+  it('can be reset by another administrator, who must be verified', async () => {
+    const admin = await makeStaff(['staff.manage']);
+    const person = await makeStaff([]);
+
+    expect((await call('POST', `admin/staff/${admin.id}/mfa/reset`, { token: admin.token })).status).toBe(403);
+    const reset = await call('POST', `admin/staff/${person.id}/mfa/reset`, { token: admin.token });
+    expect(reset.status).toBe(204);
+    expect((await me('admin', person.token)).status).toBe(401);
+    const again = await login('admin', person.email);
+    expect(again.body.accessToken).toBeDefined();
+    expect((await me('admin', again.body.accessToken)).body.mfa.setupRequired).toBe(true);
+    await expect(prisma.auditLog.count({ where: { action: 'auth.mfa_reset', targetId: person.id, actorId: admin.id } })).resolves.toBe(1);
+
+    const unverified = await newStaff(['staff.manage']);
+    const refused = await call('POST', `admin/staff/${person.id}/mfa/reset`, { token: unverified.token });
+    expect(refused.status).toBe(403);
+    expect(refused.body.code).toBe('auth.mfa_required');
+  });
+
+  it('can be made optional, except for sensitive actions', async () => {
+    const person = await newStaff(['staff.manage', 'settings.manage']);
+    await setStaffMfaRequired(false);
+    try {
+      expect((await call('GET', 'admin/staff', { token: person.token })).status).toBe(200);
+      expect((await me('admin', person.token)).body.mfa.setupRequired).toBe(false);
+      const gateway = await call('POST', 'admin/payment-gateways', {
+        token: person.token,
+        body: { type: 'paystack', name: 'x', enabled: false, mode: 'test', position: 0, config: {}, credentials: {} },
+      });
+      expect(gateway.status).toBe(403);
+      expect(gateway.body.code).toBe('auth.mfa_required');
+    } finally {
+      await setStaffMfaRequired(true);
+    }
+    expect((await call('GET', 'admin/staff', { token: person.token })).status).toBe(403);
+  });
+
+  it('does not apply to customers', async () => {
+    const customer = await register('store');
+    expect((await me('store', customer.body.accessToken)).body.mfa).toEqual({ enabled: false, verified: false, setupRequired: false });
+    expect((await call('POST', 'admin/auth/mfa/setup', { token: customer.body.accessToken })).status).toBe(401);
   });
 });

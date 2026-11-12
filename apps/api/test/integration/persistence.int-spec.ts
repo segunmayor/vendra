@@ -172,6 +172,7 @@ describe('ProcessPaymentWebhook against the database', () => {
       name: 'test',
       initialize: jest.fn(),
       refund: jest.fn(),
+      refundStatus: jest.fn(),
     testConnection: jest.fn(),
       verify,
       parseWebhook: () => ({ eventId, reference }),

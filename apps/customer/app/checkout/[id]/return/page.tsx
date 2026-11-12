@@ -20,6 +20,8 @@ export default async function PaymentReturnPage({ params, searchParams }: { para
   const verified = await session.find((api) => api.POST('/v1/store/payments/{reference}/verify', { params: { path: { reference: ref } } }));
   if (!verified || verified.checkoutId !== id) notFound();
   const checkout = await session.read((api) => api.GET('/v1/store/checkout/{id}', { params: { path: { id } } }));
+  // Placed as soon as the payment is confirmed; null only in the moment before.
+  const order = checkout.status === 'paid' ? await session.find((api) => api.GET('/v1/store/orders/by-checkout/{checkoutId}', { params: { path: { checkoutId: id } } })) : null;
   const total = formatMoney(checkout.total.amountMinor, checkout.total.currency);
 
   return (
@@ -29,6 +31,7 @@ export default async function PaymentReturnPage({ params, searchParams }: { para
         {checkout.status === 'paid' ? (
           <>
             <h1 className="text-2xl font-bold tracking-tight">Thank you. Your payment is confirmed.</h1>
+            {order ? <p className="mt-2 text-lg">Your order number is <strong>{order.number}</strong>.</p> : null}
             {checkout.stockIssue ? (
               <div className="mt-4">
                 <Alert tone="warning">
@@ -47,9 +50,16 @@ export default async function PaymentReturnPage({ params, searchParams }: { para
                 ))}
               </ul>
             </Card>
-            <Link href="/products" className={buttonVariants({ className: 'mt-6' })}>
-              Continue shopping
-            </Link>
+            <div className="mt-6 flex flex-wrap gap-3">
+              {order ? (
+                <Link href={`/account/orders/${order.id}`} className={buttonVariants()}>
+                  View your order
+                </Link>
+              ) : null}
+              <Link href="/products" className={buttonVariants({ variant: order ? 'outline' : undefined })}>
+                Continue shopping
+              </Link>
+            </div>
           </>
         ) : verified.status === 'succeeded' ? (
           <>

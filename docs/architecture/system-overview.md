@@ -55,7 +55,7 @@ Decisions:
 3. **Short-lived access, rotating refresh.** Access tokens last 15 minutes. Refresh tokens are stored hashed, rotate on every use, and reuse revokes the whole session family.
 4. **Passwords** are hashed with Argon2id.
 5. **Staff authorization** is permission-based (`orders.refund`, `vendors.approve`). Roles are named sets of permissions. Handlers check permissions, never role names.
-6. **Staff accounts require MFA** before production access to financial operations.
+6. **Staff accounts require MFA** (an authenticator app). Refunds, gateway keys and MFA resets always need a verified session. See [staff-mfa-and-refunds.md](staff-mfa-and-refunds.md).
 7. **Vendor authorization** adds tenancy: every vendor query is scoped by the `sellerId` from the token, never from a client-supplied value.
 8. **Customer authorization** is by ownership: a customer reads only their own orders, addresses and payments.
 9. **Sensitive staff actions** write to the audit log in the same transaction as the change.
@@ -64,4 +64,4 @@ Enforcement: a global guard refuses any route that is neither marked `Public` no
 
 Login failures are limited to 5 per account and 100 per IP address in 15 minutes. Session lifetimes are absolute: 30 days for customers, 14 for vendors, 12 hours for staff.
 
-Status: decisions 1, 2, 3, 4, 5, 8 and 9 are built. Decision 2 is described in [portal-sessions.md](portal-sessions.md). Still to build: staff MFA (6) and vendor tenancy (7).
+Status: decisions 1 to 6, 8 and 9 are built. Decision 2 is described in [portal-sessions.md](portal-sessions.md). Still to build: vendor tenancy (7).

@@ -44,7 +44,11 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         <Table caption="Payments" head={['Reference', 'Amount', 'Gateway', 'Status', 'Started']}>
           {payments.map((payment) => (
             <tr key={payment.id}>
-              <Td className="font-mono text-xs">{payment.reference}</Td>
+              <Td className="font-mono text-xs">
+                <Link href={`/payments/${payment.id}`} className="underline underline-offset-2">
+                  {payment.reference}
+                </Link>
+              </Td>
               <Td className="tabular-nums">{formatMoney(payment.amountMinor, payment.currency)}</Td>
               <Td className="capitalize">{payment.provider}</Td>
               <Td>

@@ -1,6 +1,7 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { ApplicationError, ApplicationErrorKind, ConcurrencyConflict, DomainError } from '../../shared-kernel';
+import { SecretBoxError } from '../crypto/secret-box';
 
 const STATUS_BY_KIND: Record<ApplicationErrorKind, number> = {
   unauthenticated: HttpStatus.UNAUTHORIZED,
@@ -37,6 +38,12 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       status = HttpStatus.CONFLICT;
       code = 'concurrency_conflict';
       detail = 'This record was changed by another request. Please retry.';
+    } else if (exception instanceof SecretBoxError) {
+      // A stored secret was saved with another encryption key, or damaged. The message says which.
+      this.logger.warn(exception.message);
+      status = HttpStatus.SERVICE_UNAVAILABLE;
+      code = 'settings.secret_unreadable';
+      detail = exception.message;
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       code = `http_${status}`;

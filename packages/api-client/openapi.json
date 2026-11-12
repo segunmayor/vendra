@@ -440,7 +440,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SessionResponse"
+                  "$ref": "#/components/schemas/AdminLoginResponse"
                 }
               }
             }
@@ -627,6 +627,166 @@
         "summary": "",
         "tags": [
           "vendor auth"
+        ]
+      }
+    },
+    "/v1/admin/auth/mfa/verify": {
+      "post": {
+        "operationId": "adminMfaVerify",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MfaVerifyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Second step of sign-in: a code from the app, or a recovery code",
+        "tags": [
+          "admin auth"
+        ]
+      }
+    },
+    "/v1/admin/auth/mfa": {
+      "get": {
+        "operationId": "adminMfaStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin auth"
+        ]
+      }
+    },
+    "/v1/admin/auth/mfa/setup": {
+      "post": {
+        "operationId": "adminMfaSetup",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaEnrolmentResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Starts setting up an authenticator app",
+        "tags": [
+          "admin auth"
+        ]
+      }
+    },
+    "/v1/admin/auth/mfa/confirm": {
+      "post": {
+        "operationId": "adminMfaConfirm",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MfaCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodesResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Turns two-step sign-in on. Returns recovery codes once.",
+        "tags": [
+          "admin auth"
+        ]
+      }
+    },
+    "/v1/admin/auth/mfa/recovery-codes": {
+      "post": {
+        "operationId": "adminMfaRecoveryCodes",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MfaCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodesResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replaces the recovery codes",
+        "tags": [
+          "admin auth"
         ]
       }
     },
@@ -853,6 +1013,35 @@
           }
         ],
         "summary": "",
+        "tags": [
+          "admin staff"
+        ]
+      }
+    },
+    "/v1/admin/staff/{id}/mfa/reset": {
+      "post": {
+        "operationId": "adminResetStaffMfa",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Turns off two-step sign-in for someone who lost their phone, and signs them out",
         "tags": [
           "admin staff"
         ]
@@ -2575,6 +2764,170 @@
         ]
       }
     },
+    "/v1/admin/payments/{id}": {
+      "get": {
+        "operationId": "adminGetPayment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentDetailResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin payments"
+        ]
+      }
+    },
+    "/v1/admin/payments/{id}/refunds": {
+      "post": {
+        "operationId": "adminRefundPayment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Returns money through the gateway the customer paid with",
+        "tags": [
+          "admin payments"
+        ]
+      }
+    },
+    "/v1/admin/refunds/{id}/check": {
+      "post": {
+        "operationId": "adminCheckRefund",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Asks the gateway how the refund is going",
+        "tags": [
+          "admin payments"
+        ]
+      }
+    },
+    "/v1/admin/refunds/{id}/resolve": {
+      "post": {
+        "operationId": "adminResolveRefund",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveRefundDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Records what the gateway dashboard shows for a refund in doubt",
+        "tags": [
+          "admin payments"
+        ]
+      }
+    },
     "/v1/store/payment-options": {
       "get": {
         "operationId": "storePaymentOptions",
@@ -2684,6 +3037,224 @@
         "summary": "Asks the gateway for the payment result. Call on return from the gateway.",
         "tags": [
           "store payments"
+        ]
+      }
+    },
+    "/v1/store/orders": {
+      "get": {
+        "operationId": "storeListOrders",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrderSummaryResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Your orders, newest first",
+        "tags": [
+          "store orders"
+        ]
+      }
+    },
+    "/v1/store/orders/by-checkout/{checkoutId}": {
+      "get": {
+        "operationId": "storeOrderForCheckout",
+        "parameters": [
+          {
+            "name": "checkoutId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The order a paid checkout became",
+        "tags": [
+          "store orders"
+        ]
+      }
+    },
+    "/v1/store/orders/{id}": {
+      "get": {
+        "operationId": "storeGetOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "store orders"
+        ]
+      }
+    },
+    "/v1/admin/orders": {
+      "get": {
+        "operationId": "adminListOrders",
+        "parameters": [
+          {
+            "name": "number",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "placed",
+                "stock_issue",
+                "cancelled",
+                "fulfilled"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrderSummaryResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Latest 100 orders, optionally by status or order number",
+        "tags": [
+          "admin orders"
+        ]
+      }
+    },
+    "/v1/admin/orders/counts": {
+      "get": {
+        "operationId": "adminOrderCounts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderCountsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin orders"
+        ]
+      }
+    },
+    "/v1/admin/orders/{id}": {
+      "get": {
+        "operationId": "adminGetOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOrderResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin orders"
         ]
       }
     }
@@ -2936,6 +3507,25 @@
           "refreshToken"
         ]
       },
+      "ProfileMfa": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "setupRequired": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "verified",
+          "setupRequired"
+        ]
+      },
       "ProfileResponse": {
         "type": "object",
         "properties": {
@@ -2958,13 +3548,17 @@
             "items": {
               "type": "string"
             }
+          },
+          "mfa": {
+            "$ref": "#/components/schemas/ProfileMfa"
           }
         },
         "required": [
           "id",
           "audience",
           "email",
-          "permissions"
+          "permissions",
+          "mfa"
         ]
       },
       "ChangePasswordDto": {
@@ -2980,6 +3574,121 @@
         "required": [
           "currentPassword",
           "newPassword"
+        ]
+      },
+      "AdminLoginResponse": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "accessToken": {
+            "type": "string"
+          },
+          "accessTokenExpiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "refreshTokenExpiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "mfaRequired": {
+            "type": "boolean",
+            "description": "True when the second step is needed: send the challenge token and a code to /v1/admin/auth/mfa/verify."
+          },
+          "challengeToken": {
+            "type": "string"
+          },
+          "challengeExpiresAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        }
+      },
+      "MfaVerifyDto": {
+        "type": "object",
+        "properties": {
+          "challengeToken": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "Six digits from the authenticator app, or a recovery code"
+          }
+        },
+        "required": [
+          "challengeToken",
+          "code"
+        ]
+      },
+      "MfaStatusResponse": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "recoveryCodesLeft": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "enabled",
+          "verified",
+          "required",
+          "recoveryCodesLeft"
+        ]
+      },
+      "MfaEnrolmentResponse": {
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "string",
+            "description": "Base32 secret, for typing into an app by hand"
+          },
+          "uri": {
+            "type": "string",
+            "description": "otpauth:// address, for a QR code"
+          }
+        },
+        "required": [
+          "secret",
+          "uri"
+        ]
+      },
+      "MfaCodeDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Six digits from the authenticator app"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "RecoveryCodesResponse": {
+        "type": "object",
+        "properties": {
+          "recoveryCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "recoveryCodes"
         ]
       },
       "RoleResponse": {
@@ -3053,6 +3762,9 @@
               "suspended"
             ]
           },
+          "mfaEnabled": {
+            "type": "boolean"
+          },
           "roles": {
             "type": "array",
             "items": {
@@ -3064,6 +3776,7 @@
           "id",
           "email",
           "status",
+          "mfaEnabled",
           "roles"
         ]
       },
@@ -4782,6 +5495,177 @@
           "createdAt"
         ]
       },
+      "RefundResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "paymentId": {
+            "type": "string"
+          },
+          "amountMinor": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "submitted",
+              "succeeded",
+              "failed",
+              "unknown"
+            ]
+          },
+          "providerRefundId": {
+            "type": "string",
+            "nullable": true
+          },
+          "gatewayStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolvedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "paymentId",
+          "amountMinor",
+          "currency",
+          "reason",
+          "requestedBy",
+          "status",
+          "createdAt"
+        ]
+      },
+      "PaymentDetailResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "checkoutId": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "gatewayId": {
+            "type": "string",
+            "nullable": true
+          },
+          "providerTransactionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "initiated",
+              "succeeded",
+              "failed",
+              "requires_review",
+              "partially_refunded",
+              "refunded"
+            ]
+          },
+          "amountMinor": {
+            "type": "string"
+          },
+          "refundedMinor": {
+            "type": "string",
+            "description": "Confirmed returned to the customer"
+          },
+          "refundPendingMinor": {
+            "type": "string",
+            "description": "In refunds the gateway has not confirmed yet"
+          },
+          "refundableMinor": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "refunds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundResponse"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "checkoutId",
+          "provider",
+          "status",
+          "amountMinor",
+          "refundedMinor",
+          "refundPendingMinor",
+          "refundableMinor",
+          "currency",
+          "refunds"
+        ]
+      },
+      "RefundDto": {
+        "type": "object",
+        "properties": {
+          "amountMinor": {
+            "type": "string",
+            "description": "In kobo, as a string of digits"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amountMinor",
+          "reason"
+        ]
+      },
+      "ResolveRefundDto": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "succeeded",
+              "failed"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "description": "What the gateway dashboard shows"
+          }
+        },
+        "required": [
+          "outcome",
+          "note"
+        ]
+      },
       "PaymentOptionResponse": {
         "type": "object",
         "properties": {
@@ -4849,6 +5733,347 @@
         "required": [
           "status",
           "checkoutId"
+        ]
+      },
+      "OrderSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "placed",
+              "stock_issue",
+              "cancelled",
+              "fulfilled"
+            ]
+          },
+          "placedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "itemCount": {
+            "type": "number",
+            "description": "Units, counting each quantity"
+          },
+          "lineCount": {
+            "type": "number",
+            "description": "Different items"
+          },
+          "firstItem": {
+            "type": "string",
+            "description": "The first item, for a short description"
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "placedAt",
+          "total",
+          "itemCount",
+          "lineCount",
+          "firstItem",
+          "city",
+          "state"
+        ]
+      },
+      "OrderAddressDto": {
+        "type": "object",
+        "properties": {
+          "recipient": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "line1": {
+            "type": "string"
+          },
+          "line2": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "recipient",
+          "phone",
+          "line1",
+          "city",
+          "state"
+        ]
+      },
+      "OrderLineDto": {
+        "type": "object",
+        "properties": {
+          "listingId": {
+            "type": "string"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "options": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unitPrice": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "lineTotal": {
+            "$ref": "#/components/schemas/MoneyDto"
+          }
+        },
+        "required": [
+          "listingId",
+          "sku",
+          "productName",
+          "options",
+          "quantity",
+          "unitPrice",
+          "lineTotal"
+        ]
+      },
+      "SellerOrderDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sellerId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "cancelled",
+              "dispatched",
+              "delivered"
+            ]
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderLineDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "sellerId",
+          "status",
+          "lines"
+        ]
+      },
+      "OrderResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "placed",
+              "stock_issue",
+              "cancelled",
+              "fulfilled"
+            ]
+          },
+          "placedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "itemCount": {
+            "type": "number",
+            "description": "Units, counting each quantity"
+          },
+          "lineCount": {
+            "type": "number",
+            "description": "Different items"
+          },
+          "firstItem": {
+            "type": "string",
+            "description": "The first item, for a short description"
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "subtotal": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "address": {
+            "$ref": "#/components/schemas/OrderAddressDto"
+          },
+          "sellerOrders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SellerOrderDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "placedAt",
+          "total",
+          "itemCount",
+          "lineCount",
+          "firstItem",
+          "city",
+          "state",
+          "subtotal",
+          "delivery",
+          "address",
+          "sellerOrders"
+        ]
+      },
+      "OrderCountsResponse": {
+        "type": "object",
+        "properties": {
+          "byStatus": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Orders in each status"
+          }
+        },
+        "required": [
+          "byStatus"
+        ]
+      },
+      "AdminOrderResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "placed",
+              "stock_issue",
+              "cancelled",
+              "fulfilled"
+            ]
+          },
+          "placedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "itemCount": {
+            "type": "number",
+            "description": "Units, counting each quantity"
+          },
+          "lineCount": {
+            "type": "number",
+            "description": "Different items"
+          },
+          "firstItem": {
+            "type": "string",
+            "description": "The first item, for a short description"
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "subtotal": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/MoneyDto"
+          },
+          "address": {
+            "$ref": "#/components/schemas/OrderAddressDto"
+          },
+          "sellerOrders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SellerOrderDto"
+            }
+          },
+          "paymentId": {
+            "type": "string"
+          },
+          "checkoutId": {
+            "type": "string"
+          },
+          "customerId": {
+            "type": "string"
+          },
+          "customerEmail": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "placedAt",
+          "total",
+          "itemCount",
+          "lineCount",
+          "firstItem",
+          "city",
+          "state",
+          "subtotal",
+          "delivery",
+          "address",
+          "sellerOrders",
+          "paymentId",
+          "checkoutId",
+          "customerId"
         ]
       }
     }
