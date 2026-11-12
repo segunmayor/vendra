@@ -6,7 +6,7 @@ import { session } from '../../../../../lib/session';
 import { updateZone } from '../actions';
 import { ZoneForm } from '../zone-form';
 
-export const metadata: Metadata = { title: 'Delivery zone · Vendra Admin' };
+export const metadata: Metadata = { title: 'Delivery zone' };
 
 export default async function ZonePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

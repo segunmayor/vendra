@@ -1,4 +1,7 @@
-import { allocate, MAX_UNITS_PER_LISTING, normalizeLines } from './reservation';
+import { allocate, normalizeLines as normalize } from './reservation';
+
+const MAX_UNITS_PER_LISTING = 10;
+const normalizeLines = (lines: Parameters<typeof normalize>[0]) => normalize(lines, MAX_UNITS_PER_LISTING);
 
 const row = (stockItemId: string, listingId: string, available: number) => ({ stockItemId, listingId, available });
 

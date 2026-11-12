@@ -24,7 +24,7 @@ Integrity rules, all covered by tests:
 
 Reconciliation is a scheduled worker job that compares provider transactions with `Payment` records and raises discrepancies for staff.
 
-**Provider choice:** the Paystack and Flutterwave evaluation is outstanding, and must be done against current official documentation. Paystack is the provisional choice for launch.
+**Providers:** Paystack and Flutterwave are both built and checked against their documentation. Staff choose which to use, and configure them in Admin. See [settings-and-payments.md](settings-and-payments.md).
 
 ### Ledger
 

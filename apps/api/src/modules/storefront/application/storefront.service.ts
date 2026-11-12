@@ -2,11 +2,10 @@ import { Money } from '../../../shared-kernel';
 import { NamedRef, PublishedProduct, PublishedProductDetail, StorefrontCatalogue } from '../../catalogue';
 import { InventoryQueries } from '../../inventory';
 import { ActiveOffer, ListingQueries } from '../../listings';
+import { SettingsReader } from '../../settings';
 
 export type Availability = 'in_stock' | 'low_stock' | 'out_of_stock';
 
-/** At or below this many units, customers see "Only N left". Above it, only "In stock". */
-export const LOW_STOCK_THRESHOLD = 5;
 /** Extra catalogue batches read to fill a page when some products have no active listing. */
 const MAX_ROUNDS = 4;
 
@@ -47,9 +46,10 @@ export interface BrowseInput {
 
 const RANK: Record<Availability, number> = { in_stock: 2, low_stock: 1, out_of_stock: 0 };
 
-function availabilityOf(available: number): Pick<Offer, 'availability' | 'lowStockQuantity'> {
+/** At or below `lowStock` units (setting store.lowStockThreshold), customers see "Only N left". */
+function availabilityOf(available: number, lowStock: number): Pick<Offer, 'availability' | 'lowStockQuantity'> {
   if (available <= 0) return { availability: 'out_of_stock', lowStockQuantity: null };
-  if (available <= LOW_STOCK_THRESHOLD) return { availability: 'low_stock', lowStockQuantity: available };
+  if (available <= lowStock) return { availability: 'low_stock', lowStockQuantity: available };
   return { availability: 'in_stock', lowStockQuantity: null };
 }
 
@@ -68,6 +68,7 @@ export class StorefrontService {
     private readonly catalogue: StorefrontCatalogue,
     private readonly listings: ListingQueries,
     private readonly inventory: InventoryQueries,
+    private readonly settings: SettingsReader,
   ) {}
 
   async categories() {
@@ -119,6 +120,7 @@ export class StorefrontService {
   private async offersFor(variantIds: readonly string[]): Promise<Map<string, Offer>> {
     const active = await this.listings.activeOffers(variantIds);
     const stock = await this.inventory.availableByListing(active.map((offer) => offer.listingId));
+    const lowStock = await this.settings.get('store.lowStockThreshold');
     const cheapest = new Map<string, ActiveOffer>();
     for (const offer of active) {
       const current = cheapest.get(offer.variantId);
@@ -127,7 +129,7 @@ export class StorefrontService {
     return new Map(
       [...cheapest].map(([variantId, offer]) => [
         variantId,
-        { listingId: offer.listingId, price: offer.price, ...availabilityOf(stock.get(offer.listingId) ?? 0) },
+        { listingId: offer.listingId, price: offer.price, ...availabilityOf(stock.get(offer.listingId) ?? 0, lowStock) },
       ]),
     );
   }

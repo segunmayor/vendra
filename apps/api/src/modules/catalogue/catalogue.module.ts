@@ -10,6 +10,7 @@ import {
   PrismaProductRepository,
 } from './infrastructure/prisma.adapters';
 import { PostgresProductSearch } from './infrastructure/product-search';
+import { SettingsReader } from '../settings';
 import { CatalogueController } from './interface/catalogue.controller';
 
 @Module({
@@ -34,9 +35,9 @@ import { CatalogueController } from './interface/catalogue.controller';
     },
     {
       provide: StorefrontCatalogue,
-      inject: [PrismaService],
-      useFactory: (prisma: PrismaService) =>
-        new StorefrontCatalogue(new PostgresProductSearch(prisma), new PrismaCategoryRepository(prisma)),
+      inject: [PrismaService, SettingsReader],
+      useFactory: (prisma: PrismaService, settings: SettingsReader) =>
+        new StorefrontCatalogue(new PostgresProductSearch(prisma, settings), new PrismaCategoryRepository(prisma)),
     },
   ],
   exports: [CatalogueQueries, StorefrontCatalogue],

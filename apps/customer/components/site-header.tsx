@@ -1,3 +1,4 @@
+import { getPublicSettings, text } from '@vendra/portal-session/server';
 import { Wordmark } from '@vendra/ui';
 import Link from 'next/link';
 import { readCart } from '../lib/cart';
@@ -5,13 +6,14 @@ import { listCategories } from '../lib/catalogue';
 import { session } from '../lib/session';
 
 export async function SiteHeader({ query }: { query?: string }) {
-  const [profile, categories, cart] = await Promise.all([session.getProfile(), listCategories(), readCart()]);
+  const [profile, categories, cart, store] = await Promise.all([session.getProfile(), listCategories(), readCart(), getPublicSettings()]);
+  const name = text(store, 'store.name');
   const top = categories.filter((category) => category.parentId === null);
   return (
     <header className="border-b border-border bg-surface">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3">
-        <Link href="/" aria-label="Vendra home">
-          <Wordmark />
+        <Link href="/" aria-label={`${name} home`}>
+          <Wordmark name={name} />
         </Link>
         <form action="/search" method="get" role="search" className="order-3 w-full sm:order-none sm:flex-1">
           <label className="sr-only" htmlFor="site-search">

@@ -10,7 +10,8 @@ export interface AccountState {
   readonly status: AccountStatus;
 }
 
-export const MIN_PASSWORD_LENGTH = 12;
+/** Hard limits. The minimum in use is a setting (security.passwordMinLength) within these bounds. */
+export const PASSWORD_FLOOR = 8;
 export const MAX_PASSWORD_LENGTH = 128;
 
 export function normalizeEmail(raw: string): string {
@@ -21,12 +22,10 @@ export function normalizeEmail(raw: string): string {
   return email;
 }
 
-export function assertPasswordAllowed(password: string): void {
-  if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
-    throw new DomainError(
-      'account.invalid_password',
-      `Passwords must be ${MIN_PASSWORD_LENGTH} to ${MAX_PASSWORD_LENGTH} characters`,
-    );
+export function assertPasswordAllowed(password: string, minLength: number): void {
+  const min = Math.max(PASSWORD_FLOOR, Math.min(minLength, MAX_PASSWORD_LENGTH));
+  if (password.length < min || password.length > MAX_PASSWORD_LENGTH) {
+    throw new DomainError('account.invalid_password', `Passwords must be ${min} to ${MAX_PASSWORD_LENGTH} characters`);
   }
 }
 

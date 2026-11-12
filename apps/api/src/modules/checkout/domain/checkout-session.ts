@@ -36,6 +36,9 @@ export interface CheckoutSessionState {
   readonly weightGrams: number;
   readonly expiresAt: Date;
   readonly version: number;
+  readonly paymentId?: string | null;
+  /** Paid, but the stock could not be secured (the hold had lapsed and the items sold). Needs a refund. */
+  readonly stockIssue?: boolean;
 }
 
 const PHONE = /^(?:\+?234|0)([789][01]\d{8})$/;
@@ -85,7 +88,15 @@ export class CheckoutSession {
     const subtotal = input.lines.reduce((sum, line) => sum.add(line.lineTotal), Money.zero(input.delivery.currency));
     if (!subtotal.isPositive()) throw new DomainError('checkout.empty', 'Your basket is empty');
     if (input.delivery.minor < 0n) throw new DomainError('checkout.invalid_delivery', 'Delivery cannot be negative');
-    return new CheckoutSession({ ...input, status: 'awaiting_payment', subtotal, total: subtotal.add(input.delivery), version: 0 });
+    return new CheckoutSession({
+      ...input,
+      status: 'awaiting_payment',
+      subtotal,
+      total: subtotal.add(input.delivery),
+      version: 0,
+      paymentId: null,
+      stockIssue: false,
+    });
   }
 
   static rehydrate(state: CheckoutSessionState): CheckoutSession {
@@ -111,6 +122,16 @@ export class CheckoutSession {
     if (status === 'paid') throw new DomainError('checkout.already_paid', 'This order has been paid and cannot be cancelled here');
     if (status !== 'awaiting_payment') return false;
     this.state = { ...this.state, status: 'cancelled' };
+    return true;
+  }
+
+  /**
+   * Records a verified payment. Money has been taken, so this is accepted even if the session
+   * expired or was cancelled meanwhile. Returns false if it was already paid.
+   */
+  markPaid(paymentId: string, stockIssue: boolean): boolean {
+    if (this.state.status === 'paid') return false;
+    this.state = { ...this.state, status: 'paid', paymentId, stockIssue };
     return true;
   }
 

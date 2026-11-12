@@ -6,7 +6,7 @@ import { session } from '../../../../../lib/session';
 import { updateCategory } from '../actions';
 import { AttributeRows } from '../attribute-rows';
 
-export const metadata: Metadata = { title: 'Category · Vendra Admin' };
+export const metadata: Metadata = { title: 'Category' };
 
 export default async function CategoryPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

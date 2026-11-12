@@ -29,6 +29,8 @@ function toSession(row: Row): CheckoutSession {
     weightGrams: row.weightGrams,
     expiresAt: row.expiresAt,
     version: row.version,
+    paymentId: row.paymentId,
+    stockIssue: row.stockIssue,
   });
 }
 
@@ -91,7 +93,7 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
     const state = session.snapshot;
     const { count } = await this.prisma.checkoutSession.updateMany({
       where: { id: state.id, version: state.version },
-      data: { status: state.status, version: { increment: 1 } },
+      data: { status: state.status, paymentId: state.paymentId ?? null, stockIssue: state.stockIssue ?? false, version: { increment: 1 } },
     });
     if (count !== 1) throw new ConcurrencyConflict('CheckoutSession', state.id);
     session.markSaved();

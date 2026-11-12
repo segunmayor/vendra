@@ -2,6 +2,7 @@ import { Money, Principal } from '../../../shared-kernel';
 import type { CartPricing, CartService } from '../../cart';
 import type { InventoryCommands } from '../../inventory';
 import type { LogisticsService } from '../../logistics';
+import type { SettingsReader } from '../../settings';
 import { CheckoutSession, parseAddress } from '../domain/checkout-session';
 import { CheckoutRepository, CheckoutService } from './checkout.service';
 
@@ -25,6 +26,8 @@ function existing(key: string): CheckoutSession {
     version: 1,
   });
 }
+
+const settings = { get: async () => 15 } as unknown as SettingsReader;
 
 function setup(open: CheckoutSession[]) {
   const released: string[] = [];
@@ -53,7 +56,7 @@ function setup(open: CheckoutSession[]) {
     reserve: async (id: string) => void reserved.push(id),
     release: async (id: string) => void released.push(id),
   } as unknown as InventoryCommands;
-  const service = new CheckoutService(sessions, carts, pricing, logistics, inventory, { uuid: () => 'new-session' }, { now: () => now });
+  const service = new CheckoutService(sessions, carts, pricing, logistics, inventory, { uuid: () => 'new-session' }, { now: () => now }, settings);
   return { service, released, updated, reserved };
 }
 

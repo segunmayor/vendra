@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ENV, Env } from '../../platform/config/env';
 import { PrismaService } from '../../platform/prisma/prisma.service';
+import { SettingsReader } from '../settings';
 import { AuthService } from './application/auth.service';
 import { Clock } from './application/ports';
 import { StaffService } from './application/staff.service';
@@ -24,8 +25,8 @@ const clock: Clock = { now: () => new Date() };
   providers: [
     {
       provide: AuthService,
-      inject: [PrismaService, ENV],
-      useFactory: (prisma: PrismaService, env: Env) =>
+      inject: [PrismaService, ENV, SettingsReader],
+      useFactory: (prisma: PrismaService, env: Env, settings: SettingsReader) =>
         new AuthService(
           new PrismaAccountRepository(prisma),
           new PrismaSessionRepository(prisma),
@@ -35,12 +36,13 @@ const clock: Clock = { now: () => new Date() };
           new PrismaLoginThrottle(prisma),
           new PrismaAuditTrail(prisma),
           clock,
+          settings,
         ),
     },
     {
       provide: StaffService,
-      inject: [PrismaService],
-      useFactory: (prisma: PrismaService) =>
+      inject: [PrismaService, SettingsReader],
+      useFactory: (prisma: PrismaService, settings: SettingsReader) =>
         new StaffService(
           new PrismaAccountRepository(prisma),
           new PrismaRoleRepository(prisma),
@@ -48,6 +50,7 @@ const clock: Clock = { now: () => new Date() };
           new NodeSecrets(),
           new PrismaAuditTrail(prisma),
           clock,
+          settings,
         ),
     },
     { provide: APP_GUARD, useClass: AuthGuard },

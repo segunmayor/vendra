@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { SiteHeader } from '../../../components/site-header';
 import { session } from '../../../lib/session';
-import { cancelCheckout } from '../actions';
+import { cancelCheckout, payWith } from '../actions';
 
-export const metadata: Metadata = { title: 'Your order · Vendra', robots: { index: false } };
+export const metadata: Metadata = { title: 'Your order', robots: { index: false } };
 
 const time = new Intl.DateTimeFormat('en-NG', { timeStyle: 'short', timeZone: 'Africa/Lagos' });
 
@@ -16,6 +16,7 @@ export default async function CheckoutSessionPage({ params }: { params: Promise<
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const checkout = await session.find((api) => api.GET('/v1/store/checkout/{id}', { params: { path: { id } } }));
   if (!checkout) notFound();
+  const options = checkout.status === 'awaiting_payment' ? await session.read((api) => api.GET('/v1/store/payment-options')) : [];
   const money = (value: { amountMinor: string; currency: string }) => formatMoney(value.amountMinor, value.currency);
   const open = checkout.status === 'awaiting_payment';
 
@@ -32,6 +33,8 @@ export default async function CheckoutSessionPage({ params }: { params: Promise<
             <Alert tone="warning">The 15-minute hold has ended and the items are back on sale. Your basket is unchanged, so you can check out again.</Alert>
           ) : checkout.status === 'cancelled' ? (
             <Alert tone="warning">This checkout was cancelled. Your basket is unchanged.</Alert>
+          ) : checkout.status === 'paid' ? (
+            <Alert tone="success">Payment received. Thank you.</Alert>
           ) : null}
         </div>
 
@@ -77,8 +80,21 @@ export default async function CheckoutSessionPage({ params }: { params: Promise<
 
         {open ? (
           <div className="mt-6 space-y-3">
-            {/* Step 6 connects the payment provider here. */}
-            <p className="rounded-brand border border-border bg-surface px-4 py-3 text-sm">Online payment is being connected. Your order will not be placed until payment is confirmed.</p>
+            {options.length === 0 ? (
+              <p className="rounded-brand border border-border bg-surface px-4 py-3 text-sm">Online payment is not available right now. Please try again shortly.</p>
+            ) : (
+              <div className="space-y-2">
+                <h2 className="text-sm font-semibold">Pay securely with</h2>
+                {options.map((option) => (
+                  <ActionForm key={option.id} action={payWith.bind(null, checkout.id, option.id)}>
+                    <SubmitButton size="lg" className="w-full" pendingLabel="Opening payment page…">
+                      Pay {money(checkout.total)} with {option.name}
+                    </SubmitButton>
+                  </ActionForm>
+                ))}
+                <p className="text-xs text-muted">You will pay on the gateway&apos;s secure page, then come back here. Your order is placed once the payment is confirmed.</p>
+              </div>
+            )}
             <ActionForm action={cancelCheckout.bind(null, checkout.id)}>
               <SubmitButton variant="outline" pendingLabel="Cancelling…">
                 Cancel and release items

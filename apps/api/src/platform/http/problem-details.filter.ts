@@ -8,6 +8,7 @@ const STATUS_BY_KIND: Record<ApplicationErrorKind, number> = {
   not_found: HttpStatus.NOT_FOUND,
   conflict: HttpStatus.CONFLICT,
   rate_limited: HttpStatus.TOO_MANY_REQUESTS,
+  unavailable: HttpStatus.SERVICE_UNAVAILABLE,
 };
 
 /** Renders every error as RFC 9457. Unexpected errors never leak details to clients. */

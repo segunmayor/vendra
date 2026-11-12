@@ -12,13 +12,14 @@ const amount = Money.of(10_000n, 'NGN');
 const body = new Uint8Array();
 
 function setup() {
-  const payment = Payment.initiate({ id: 'p1', orderId: 'o1', reference: 'ref1', provider: 'test', amount });
+  const payment = Payment.initiate({ id: 'p1', checkoutId: 'o1', reference: 'ref1', provider: 'test', amount });
   const verification: ProviderVerification = { outcome: 'succeeded', amount, providerTransactionId: 'tx1' };
   const verify = jest.fn(async () => verification);
   const provider: PaymentProviderPort = {
     name: 'test',
     initialize: jest.fn(),
     refund: jest.fn(),
+    testConnection: jest.fn(),
     verify,
     parseWebhook: (_raw, headers) => {
       if (headers['x-signature'] !== 'good') throw new InvalidWebhookSignature();

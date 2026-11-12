@@ -5,7 +5,7 @@ import { session } from '../../../../../lib/session';
 import { createProduct } from '../actions';
 import { AttributeFields } from '../attribute-fields';
 
-export const metadata: Metadata = { title: 'Add product · Vendra Admin' };
+export const metadata: Metadata = { title: 'Add product' };
 
 export default async function NewProductPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const { categoryId } = await searchParams;

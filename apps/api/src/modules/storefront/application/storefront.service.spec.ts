@@ -2,6 +2,7 @@ import { Money } from '../../../shared-kernel';
 import type { PublishedProduct, StorefrontCatalogue } from '../../catalogue';
 import type { InventoryQueries } from '../../inventory';
 import type { ActiveOffer, ListingQueries } from '../../listings';
+import type { SettingsReader } from '../../settings';
 import { StorefrontService } from './storefront.service';
 
 const ngn = (minor: bigint) => Money.of(minor, 'NGN');
@@ -47,7 +48,8 @@ function setup(products: PublishedProduct[], offers: ActiveOffer[], stock: Recor
   const inventory = {
     availableByListing: async (ids: readonly string[]) => new Map(ids.map((id) => [id, stock[id] ?? 0])),
   } as unknown as InventoryQueries;
-  return { service: new StorefrontService(catalogue, listings, inventory), searchCalls };
+  const settings = { get: async () => 5 } as unknown as SettingsReader;
+  return { service: new StorefrontService(catalogue, listings, inventory, settings), searchCalls };
 }
 
 const offer = (variantId: string, minor: bigint, listingId = `l-${variantId}`): ActiveOffer => ({

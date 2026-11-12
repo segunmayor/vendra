@@ -20,6 +20,27 @@ export type Profile = components['schemas']['ProfileResponse'];
 export type { Audience };
 export { safeNextPath };
 
+export type PublicSettings = Readonly<Record<string, string | number | boolean>>;
+
+/** Store-wide settings staff edit in Admin (name, headline, support contacts). Cached for a minute. */
+export const getPublicSettings = cache(async (): Promise<PublicSettings> => {
+  const { apiBaseUrl } = settings();
+  try {
+    // `next` is Next.js's fetch extension; its types live in the apps that use this package.
+    const response = await fetch(`${apiBaseUrl}/v1/store/settings`, { next: { revalidate: 60 } } as RequestInit);
+    if (response.ok) return ((await response.json()) as { values: PublicSettings }).values;
+  } catch {
+    // Fall through: pages still render, with the name blank, if the API is briefly unreachable.
+  }
+  return {};
+});
+
+/** A text setting, or the fallback while settings cannot be loaded. */
+export function text(values: PublicSettings, key: string, fallback = ''): string {
+  const value = values[key];
+  return typeof value === 'string' ? value : fallback;
+}
+
 export type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; message: string };
 
 /** Thrown when the API refuses a refresh token: the session is over and the user must sign in. */
@@ -123,7 +144,7 @@ export function createPortalSession(audience: Audience, options: PortalSessionOp
     try {
       response = await postJson(config, `/v1/${audience}/auth/${kind}`, { email, password }, portalHeaders(config, forwardedFor));
     } catch {
-      return { ok: false, message: 'We could not reach Vendra. Please try again in a moment.' };
+      return { ok: false, message: 'We could not reach the store. Please try again in a moment.' };
     }
     if (!response.ok) {
       const fallback = kind === 'login' ? 'Incorrect email or password' : 'We could not create your account';
@@ -231,14 +252,14 @@ export function createPortalSession(audience: Audience, options: PortalSessionOp
       try {
         accessToken = await actionAccessToken();
       } catch {
-        return { ok: false, message: 'We could not reach Vendra. Please try again in a moment.' };
+        return { ok: false, message: 'We could not reach the store. Please try again in a moment.' };
       }
       if (!accessToken) return toLogin();
       let result: { data?: T; error?: unknown; response: Response };
       try {
         result = await call(client(config, accessToken));
       } catch {
-        return { ok: false, message: 'We could not reach Vendra. Please try again in a moment.' };
+        return { ok: false, message: 'We could not reach the store. Please try again in a moment.' };
       }
       const { data, error, response } = result;
       if (response.status === 401) return toLogin();

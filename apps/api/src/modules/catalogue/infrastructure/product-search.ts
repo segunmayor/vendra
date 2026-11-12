@@ -1,9 +1,8 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
 import type { NamedRef, ProductSearch, PublishedProduct, SearchFilter, SearchPosition } from '../application/storefront';
 import type { AttributeValue } from '../domain/attributes';
+import type { SettingsReader } from '../../settings';
 
-/** A typo still matches when this share of its trigrams appear in a word of the name. Tuned on 11 Nov 2026. */
-const TYPO_THRESHOLD = 0.5;
 
 interface Row {
   id: string;
@@ -40,7 +39,10 @@ const images = (value: unknown): string[] => (Array.isArray(value) ? value.filte
 
 /** PostgreSQL full-text search with trigram typo tolerance. Owns only catalogue tables. */
 export class PostgresProductSearch implements ProductSearch {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly settings: SettingsReader,
+  ) {}
 
   async search(filter: SearchFilter, after: SearchPosition | null, limit: number) {
     const rows = filter.text ? await this.byRelevance(filter, after, limit) : await this.byNewest(filter, after, limit);
@@ -62,9 +64,11 @@ export class PostgresProductSearch implements ProductSearch {
   private async byRelevance(filter: SearchFilter, after: SearchPosition | null, limit: number): Promise<Row[]> {
     const text = filter.text!;
     const offset = after?.kind === 'rank' ? after.offset : 0;
-    // SET LOCAL needs a transaction; it lets the trigram index serve the <% operator at our threshold.
+    // A typo matches when this share of its trigrams appear in a word of the name (setting
+    // search.typoTolerance, 0.3 to 0.9). set_config with is_local = true lasts for the transaction.
+    const threshold = await this.settings.get('search.typoTolerance');
     return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe(`SET LOCAL pg_trgm.word_similarity_threshold = ${TYPO_THRESHOLD}`);
+      await tx.$executeRaw`SELECT set_config('pg_trgm.word_similarity_threshold', ${String(threshold)}, true)`;
       return tx.$queryRaw<Row[]>`
         WITH q AS (
           SELECT websearch_to_tsquery('english', catalogue.search_text(${text})) AS query,

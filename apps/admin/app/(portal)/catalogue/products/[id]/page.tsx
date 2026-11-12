@@ -18,7 +18,7 @@ import {
 } from '../actions';
 import { AttributeFields } from '../attribute-fields';
 
-export const metadata: Metadata = { title: 'Product · Vendra Admin' };
+export const metadata: Metadata = { title: 'Product' };
 
 const REASONS = [
   { value: 'receipt', label: 'Received from supplier' },

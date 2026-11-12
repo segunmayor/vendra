@@ -7,7 +7,7 @@ import { SiteHeader } from '../../components/site-header';
 import { type CartLine, readCart } from '../../lib/cart';
 import { updateItem } from './actions';
 
-export const metadata: Metadata = { title: 'Your basket · Vendra', robots: { index: false } };
+export const metadata: Metadata = { title: 'Your basket', robots: { index: false } };
 
 function issueText(line: CartLine): string | null {
   switch (line.issue) {

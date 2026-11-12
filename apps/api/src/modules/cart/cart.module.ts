@@ -7,6 +7,7 @@ import { InventoryQueries } from '../inventory';
 import { InventoryModule } from '../inventory/inventory.module';
 import { ListingQueries } from '../listings';
 import { ListingsModule } from '../listings/listings.module';
+import { SettingsReader } from '../settings';
 import { CartService } from './application/cart.service';
 import { CartPricing } from './application/pricing';
 import { CryptoCartTokens, PrismaCartRepository } from './infrastructure/prisma-cart.repository';
@@ -23,9 +24,9 @@ import { CartController } from './interface/cart.controller';
     },
     {
       provide: CartService,
-      inject: [PrismaService, CartPricing],
-      useFactory: (prisma: PrismaService, pricing: CartPricing) =>
-        new CartService(new PrismaCartRepository(prisma), pricing, new CryptoCartTokens(), { uuid: randomUUID }),
+      inject: [PrismaService, CartPricing, SettingsReader],
+      useFactory: (prisma: PrismaService, pricing: CartPricing, settings: SettingsReader) =>
+        new CartService(new PrismaCartRepository(prisma), pricing, new CryptoCartTokens(), { uuid: randomUUID }, settings),
     },
   ],
   exports: [CartService, CartPricing],

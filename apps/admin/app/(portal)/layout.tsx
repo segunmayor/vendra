@@ -1,3 +1,4 @@
+import { getPublicSettings, text } from '@vendra/portal-session/server';
 import { type NavItem, PortalShell, Wordmark } from '@vendra/ui';
 import { headers } from 'next/headers';
 import Link from 'next/link';
@@ -12,7 +13,10 @@ const NAVIGATION: readonly (NavItem & { permission?: string })[] = [
   { label: 'Categories', href: '/catalogue/categories', permission: 'catalogue.manage' },
   { label: 'Brands', href: '/catalogue/brands', permission: 'catalogue.manage' },
   { label: 'Warehouses', href: '/inventory/warehouses', permission: 'inventory.manage' },
+  { label: 'Payments', href: '/payments', permission: 'payments.read' },
   { label: 'Delivery prices', href: '/settings/delivery', permission: 'settings.manage' },
+  { label: 'Payment gateways', href: '/settings/payments', permission: 'settings.manage' },
+  { label: 'Settings', href: '/settings/general', permission: 'settings.manage' },
 ];
 
 export default async function PortalLayout({ children }: { children: ReactNode }) {
@@ -22,7 +26,7 @@ export default async function PortalLayout({ children }: { children: ReactNode }
 
   return (
     <PortalShell
-      brand={<Wordmark suffix="Admin" />}
+      brand={<Wordmark name={text(await getPublicSettings(), 'store.name')} suffix="Admin" />}
       navigation={navigation}
       currentPath={path}
       renderLink={(item, props) => (

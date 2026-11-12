@@ -65,15 +65,17 @@ export class PrismaReservationStore implements ReservationStore {
           UPDATE "inventory"."stock_items" SET "reserved" = "reserved" + ${allocation.quantity}, "version" = "version" + 1
           WHERE "id" = ${allocation.stockItemId}::uuid`;
       }
-      await tx.stockReservation.createMany({
-        data: allocations.map((allocation) => ({
-          stockItemId: allocation.stockItemId,
-          checkoutId,
-          quantity: allocation.quantity,
-          status: 'held',
-          expiresAt,
-        })),
-      });
+      // A checkout reserving again (for example a late payment after its hold lapsed) revives
+      // its old released or expired rows rather than adding duplicates. Committed rows are never revived.
+      for (const allocation of allocations) {
+        const revived = await tx.$executeRaw`
+          INSERT INTO "inventory"."stock_reservations" ("id", "stockItemId", "checkoutId", "quantity", "status", "expiresAt")
+          VALUES (gen_random_uuid(), ${allocation.stockItemId}::uuid, ${checkoutId}::uuid, ${allocation.quantity}, 'held', ${expiresAt})
+          ON CONFLICT ("checkoutId", "stockItemId") DO UPDATE
+            SET "status" = 'held', "quantity" = EXCLUDED."quantity", "expiresAt" = EXCLUDED."expiresAt", "createdAt" = now()
+            WHERE "inventory"."stock_reservations"."status" IN ('released', 'expired')`;
+        if (revived !== 1) throw new Error(`Reservation for checkout ${checkoutId} is already committed`);
+      }
       return { created: true, held: await this.heldIn(tx, checkoutId) };
     });
   }
@@ -89,6 +91,34 @@ export class PrismaReservationStore implements ReservationStore {
         RETURNING "stockItemId", "quantity"`;
       await giveBack(tx, released);
       return released.length;
+    });
+  }
+
+  async commit(checkoutId: string, now: Date): Promise<HeldReservation[]> {
+    return this.prisma.$transaction(async (tx) => {
+      const items = await tx.stockReservation.findMany({ where: { checkoutId, status: 'held' }, select: { stockItemId: true } });
+      if (items.length === 0) return [];
+      await lockStock(tx, Prisma.sql`"id" = ANY(${items.map((item) => item.stockItemId)}::uuid[])`);
+      const committed = await tx.$queryRaw<(Released & { listingId: string; expiresAt: Date })[]>`
+        UPDATE "inventory"."stock_reservations" r SET "status" = 'committed'
+        FROM "inventory"."stock_items" s
+        WHERE r."checkoutId" = ${checkoutId}::uuid AND r."status" = 'held' AND s."id" = r."stockItemId"
+        RETURNING r."stockItemId", r."quantity", s."listingId", r."expiresAt"`;
+      for (const row of committed) {
+        await tx.$executeRaw`
+          UPDATE "inventory"."stock_items"
+          SET "onHand" = "onHand" - ${row.quantity}, "reserved" = "reserved" - ${row.quantity}, "version" = "version" + 1
+          WHERE "id" = ${row.stockItemId}::uuid`;
+        await tx.stockMovement.create({
+          data: { stockItemId: row.stockItemId, delta: -row.quantity, reason: 'sale', sourceType: 'checkout', sourceId: checkoutId, createdAt: now },
+        });
+      }
+      const byListing = new Map<string, HeldReservation>();
+      for (const row of committed) {
+        const current = byListing.get(row.listingId);
+        byListing.set(row.listingId, { listingId: row.listingId, quantity: (current?.quantity ?? 0) + row.quantity, expiresAt: row.expiresAt });
+      }
+      return [...byListing.values()];
     });
   }
 
@@ -109,6 +139,10 @@ export class PrismaReservationStore implements ReservationStore {
       await giveBack(tx, expired);
       return expired.length;
     });
+  }
+
+  async hasCommitted(checkoutId: string): Promise<boolean> {
+    return (await this.prisma.stockReservation.count({ where: { checkoutId, status: 'committed' } })) > 0;
   }
 
   held(checkoutId: string): Promise<HeldReservation[]> {

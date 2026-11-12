@@ -29,6 +29,16 @@ model OutboxEvent {
   @@schema("platform")
 }
 
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @default(now()) @db.Timestamptz
+  updatedBy String?  @db.Uuid
+
+  @@map("settings")
+  @@schema("platform")
+}
+
 model IdempotencyRecord {
   id           String   @id @default(uuid()) @db.Uuid
   scope        String
@@ -391,6 +401,8 @@ model CheckoutSession {
   totalMinor     BigInt
   weightGrams    Int
   expiresAt      DateTime @db.Timestamptz
+  paymentId      String?  @db.Uuid
+  stockIssue     Boolean  @default(false)
   version        Int      @default(0)
   createdAt      DateTime @default(now()) @db.Timestamptz
   updatedAt      DateTime @updatedAt @db.Timestamptz
@@ -483,7 +495,10 @@ enum PaymentStatus {
 
 model Payment {
   id                    String           @id @default(uuid()) @db.Uuid
-  orderId               String           @db.Uuid
+  /// The checkout session this pays for. The order is created after verification.
+  checkoutId            String           @db.Uuid
+  gatewayId             String?          @db.Uuid
+  redirectUrl           String?
   reference             String           @unique
   provider              String
   amountMinor           BigInt
@@ -498,8 +513,28 @@ model Payment {
   refunds               Refund[]
 
   @@unique([provider, providerTransactionId])
-  @@index([orderId])
+  @@index([checkoutId])
+  @@index([gatewayId])
   @@map("payments")
+  @@schema("payments")
+}
+
+model PaymentGateway {
+  id          String   @id @db.Uuid
+  type        String
+  name        String
+  enabled     Boolean  @default(false)
+  mode        String   @default("test")
+  position    Int      @default(0)
+  config      Json     @default("{}")
+  /// AES-256-GCM ciphertext of the credentials. Never plain text.
+  secrets     String?
+  secretHints Json     @default("{}")
+  version     Int      @default(0)
+  createdAt   DateTime @default(now()) @db.Timestamptz
+  updatedAt   DateTime @updatedAt @db.Timestamptz
+
+  @@map("gateways")
   @@schema("payments")
 }
 

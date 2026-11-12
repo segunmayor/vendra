@@ -1,8 +1,13 @@
 import { DomainError } from '../../../shared-kernel';
 
-/** Matches inventory's per-checkout cap, so a full cart can always be reserved. */
-export const MAX_LINE_QUANTITY = 10;
-export const MAX_LINES = 30;
+/**
+ * Limits from settings: maxQuantity is shopping.maxQuantityPerItem, the same value inventory
+ * enforces when reserving, so a full cart can always be reserved. maxLines is shopping.maxBasketLines.
+ */
+export interface CartLimits {
+  readonly maxQuantity: number;
+  readonly maxLines: number;
+}
 
 export type CartOwner = { readonly kind: 'customer'; readonly customerId: string } | { readonly kind: 'guest'; readonly tokenHash: string };
 
@@ -18,12 +23,12 @@ export interface CartState {
   readonly version: number;
 }
 
-function assertQuantity(quantity: number): void {
+function assertQuantity(quantity: number, limits: CartLimits): void {
   if (!Number.isInteger(quantity) || quantity < 0) {
     throw new DomainError('cart.invalid_quantity', 'Quantity must be a whole number');
   }
-  if (quantity > MAX_LINE_QUANTITY) {
-    throw new DomainError('cart.quantity_limit', `You can buy at most ${MAX_LINE_QUANTITY} of one item per order`);
+  if (quantity > limits.maxQuantity) {
+    throw new DomainError('cart.quantity_limit', `You can buy at most ${limits.maxQuantity} of one item per order`);
   }
 }
 
@@ -48,21 +53,21 @@ export class Cart {
   }
 
   /** Adds to any quantity already in the cart. */
-  add(listingId: string, quantity: number): void {
+  add(listingId: string, quantity: number, limits: CartLimits): void {
     if (quantity < 1) throw new DomainError('cart.invalid_quantity', 'Add at least one');
-    this.set(listingId, this.quantityOf(listingId) + quantity);
+    this.set(listingId, this.quantityOf(listingId) + quantity, limits);
   }
 
   /** Sets a line's quantity. Zero removes the line. */
-  set(listingId: string, quantity: number): void {
-    assertQuantity(quantity);
+  set(listingId: string, quantity: number, limits: CartLimits): void {
+    assertQuantity(quantity, limits);
     const exists = this.state.lines.some((line) => line.listingId === listingId);
     if (quantity === 0) {
       this.state = { ...this.state, lines: this.state.lines.filter((line) => line.listingId !== listingId) };
       return;
     }
-    if (!exists && this.state.lines.length >= MAX_LINES) {
-      throw new DomainError('cart.too_many_lines', `A basket can hold up to ${MAX_LINES} different items`);
+    if (!exists && this.state.lines.length >= limits.maxLines) {
+      throw new DomainError('cart.too_many_lines', `A basket can hold up to ${limits.maxLines} different items`);
     }
     this.state = {
       ...this.state,
@@ -76,17 +81,17 @@ export class Cart {
    * Moves a guest's items into this cart when they sign in. Quantities add up but are capped
    * rather than refused, so signing in never fails because of the basket.
    */
-  absorb(other: Cart): { capped: boolean } {
+  absorb(other: Cart, limits: CartLimits): { capped: boolean } {
     let capped = false;
     for (const line of other.snapshot.lines) {
       const total = this.quantityOf(line.listingId) + line.quantity;
       const exists = this.quantityOf(line.listingId) > 0;
-      if (!exists && this.state.lines.length >= MAX_LINES) {
+      if (!exists && this.state.lines.length >= limits.maxLines) {
         capped = true;
         continue;
       }
-      if (total > MAX_LINE_QUANTITY) capped = true;
-      this.set(line.listingId, Math.min(total, MAX_LINE_QUANTITY));
+      if (total > limits.maxQuantity) capped = true;
+      this.set(line.listingId, Math.min(total, limits.maxQuantity), limits);
     }
     return { capped };
   }

@@ -36,7 +36,7 @@ async function change(call: Call): Promise<CartActionResult> {
   try {
     token = await session.actionAccessToken();
   } catch (error) {
-    if (error instanceof SessionUnavailable) return { ok: false, message: 'We could not reach Vendra. Please try again in a moment.' };
+    if (error instanceof SessionUnavailable) return { ok: false, message: 'We could not reach the store. Please try again in a moment.' };
     throw error;
   }
   const guest = (await cookies()).get(GUEST_CART_COOKIE)?.value;
@@ -44,7 +44,7 @@ async function change(call: Call): Promise<CartActionResult> {
   try {
     result = await call(client(token, guest));
   } catch {
-    return { ok: false, message: 'We could not reach Vendra. Please try again in a moment.' };
+    return { ok: false, message: 'We could not reach the store. Please try again in a moment.' };
   }
   const { data, error, response } = result;
   if (!response.ok || !data) {

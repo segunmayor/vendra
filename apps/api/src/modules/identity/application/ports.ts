@@ -17,7 +17,7 @@ export interface AccessClaims {
 }
 
 export interface AccessTokenService {
-  issue(claims: AccessClaims): { token: string; expiresAt: Date };
+  issue(claims: AccessClaims, ttlSeconds: number): { token: string; expiresAt: Date };
   /** Returns null for any token that is invalid, expired, or for another audience. */
   verify(token: string, audience: Audience): AccessClaims | null;
 }

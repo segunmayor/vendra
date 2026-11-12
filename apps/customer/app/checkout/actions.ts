@@ -32,6 +32,18 @@ export async function startCheckout(_state: FormState, data: FormData): Promise<
   redirect(`/checkout/${result.data.id}`);
 }
 
+const isUuid = (value: string) => UUID.test(value);
+
+/** Starts payment with the chosen gateway and sends the customer to its payment page. */
+export async function payWith(checkoutId: string, gatewayId: string, _state: FormState): Promise<FormState> {
+  if (!isUuid(checkoutId) || !isUuid(gatewayId)) return { status: 'error', message: 'Please reload the page and try again' };
+  const result = await session.mutate((api) => api.POST('/v1/store/checkout/{id}/payments', { params: { path: { id: checkoutId } }, body: { gatewayId } }));
+  if (!result.ok) return { status: 'error', message: result.message };
+  // Only gateway payment pages over HTTPS, as returned by the API.
+  if (!/^https:\/\//.test(result.data.redirectUrl)) return { status: 'error', message: 'The payment page could not be opened. Please try again.' };
+  redirect(result.data.redirectUrl);
+}
+
 export async function cancelCheckout(checkoutId: string, _state: FormState): Promise<FormState> {
   const result = await session.mutate((api) => api.POST('/v1/store/checkout/{id}/cancel', { params: { path: { id: checkoutId } } }));
   revalidatePath(`/checkout/${checkoutId}`);

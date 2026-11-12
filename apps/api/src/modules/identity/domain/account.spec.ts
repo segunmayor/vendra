@@ -20,11 +20,17 @@ describe('Account', () => {
   });
 
   it.each([['too short', 'x'.repeat(11)], ['too long', 'x'.repeat(129)]])('rejects a password that is %s', (_n, p) => {
-    expect(() => assertPasswordAllowed(p)).toThrow(DomainError);
+    expect(() => assertPasswordAllowed(p, 12)).toThrow(DomainError);
   });
 
   it.each([12, 128])('accepts a password of %i characters', (length) => {
-    expect(() => assertPasswordAllowed('x'.repeat(length))).not.toThrow();
+    expect(() => assertPasswordAllowed('x'.repeat(length), 12)).not.toThrow();
+  });
+
+  it('uses the configured minimum but never goes below the floor of 8', () => {
+    expect(() => assertPasswordAllowed('x'.repeat(15), 16)).toThrow('16 to 128');
+    expect(() => assertPasswordAllowed('x'.repeat(8), 2)).not.toThrow();
+    expect(() => assertPasswordAllowed('x'.repeat(7), 2)).toThrow('8 to 128');
   });
 
   it('suspends once', () => {

@@ -1,9 +1,5 @@
 import { DomainError } from '../../../shared-kernel';
 
-/** How long a checkout holds stock while the customer pays. */
-export const RESERVATION_MINUTES = 15;
-/** Most units of one listing a single checkout may hold. Stops one buyer emptying the shelf. */
-export const MAX_UNITS_PER_LISTING = 10;
 
 export interface RequestedLine {
   readonly listingId: string;
@@ -28,8 +24,11 @@ export interface Shortfall {
   readonly available: number;
 }
 
-/** Merges duplicate listings and checks quantities before anything is locked. */
-export function normalizeLines(lines: readonly RequestedLine[]): RequestedLine[] {
+/**
+ * Merges duplicate listings and checks quantities before anything is locked. `maxPerListing`
+ * (setting shopping.maxQuantityPerItem) stops one buyer emptying the shelf.
+ */
+export function normalizeLines(lines: readonly RequestedLine[], maxPerListing: number): RequestedLine[] {
   if (lines.length === 0) throw new DomainError('reservation.empty', 'Nothing to reserve');
   const totals = new Map<string, number>();
   for (const line of lines) {
@@ -39,8 +38,8 @@ export function normalizeLines(lines: readonly RequestedLine[]): RequestedLine[]
     totals.set(line.listingId, (totals.get(line.listingId) ?? 0) + line.quantity);
   }
   for (const [, quantity] of totals) {
-    if (quantity > MAX_UNITS_PER_LISTING) {
-      throw new DomainError('reservation.too_many', `You can buy at most ${MAX_UNITS_PER_LISTING} of one item per order`);
+    if (quantity > maxPerListing) {
+      throw new DomainError('reservation.too_many', `You can buy at most ${maxPerListing} of one item per order`);
     }
   }
   return [...totals].map(([listingId, quantity]) => ({ listingId, quantity }));

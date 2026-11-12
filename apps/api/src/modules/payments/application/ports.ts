@@ -21,6 +21,16 @@ export interface PaymentProviderPort {
   /** Must throw `InvalidWebhookSignature` when the signature does not match. */
   parseWebhook(rawBody: Uint8Array, headers: Record<string, string>): WebhookNotice;
   refund(providerTransactionId: string, amount: Money): Promise<{ providerRefundId: string }>;
+  /** Makes a harmless authenticated call, so staff can check the credentials work. */
+  testConnection(): Promise<void>;
+}
+
+/** The gateway could not be reached, timed out, or rejected the request. Safe to show to staff. */
+export class ProviderUnavailable extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ProviderUnavailable';
+  }
 }
 
 export interface PaymentRepository {

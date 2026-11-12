@@ -38,6 +38,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminListSettings"];
+        /** Changes several settings at once. All are validated before any is saved. */
+        put: operations["adminUpdateSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["storePublicSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/store/auth/login": {
         parameters: {
             query?: never;
@@ -874,6 +907,137 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/payment-gateways/types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminListGatewayTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/payment-gateways": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminListGateways"];
+        put?: never;
+        post: operations["adminCreateGateway"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/payment-gateways/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["adminUpdateGateway"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/payment-gateways/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Checks the saved credentials with the gateway */
+        post: operations["adminTestGateway"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminListPayments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store/payment-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["storePaymentOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store/checkout/{id}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Starts payment for an open checkout. Repeating it reuses the same payment. */
+        post: operations["storeStartPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store/payments/{reference}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Asks the gateway for the payment result. Call on return from the gateway. */
+        post: operations["storeVerifyPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -881,6 +1045,44 @@ export interface components {
         HealthResponse: {
             /** @example ok */
             status: string;
+        };
+        SettingResponse: {
+            key: string;
+            label: string;
+            description: string;
+            /** @enum {string} */
+            kind: "integer" | "decimal" | "text" | "longtext" | "email" | "phone" | "url" | "boolean";
+            value: string | number | boolean;
+            defaultValue: string | number | boolean;
+            isDefault: boolean;
+            public: boolean;
+            min?: number;
+            max?: number;
+            step?: number;
+            maxLength?: number;
+            unit?: string;
+            optional?: boolean;
+        };
+        SettingGroupResponse: {
+            group: string;
+            label: string;
+            description: string;
+            settings: components["schemas"]["SettingResponse"][];
+        };
+        UpdateSettingsDto: {
+            /**
+             * @example {
+             *       "shopping.holdMinutes": 20
+             *     }
+             */
+            values: {
+                [key: string]: string | number | boolean;
+            };
+        };
+        PublicSettingsResponse: {
+            values: {
+                [key: string]: string | number | boolean;
+            };
         };
         CredentialsDto: {
             email: string;
@@ -1281,9 +1483,107 @@ export interface components {
              * @description Stock is held until this time
              */
             expiresAt: string;
+            /** @description Paid, but an item sold out before payment arrived. Staff will refund. */
+            stockIssue: boolean;
         };
         LastAddressResponse: {
             address?: components["schemas"]["SavedAddressResponse"] | null;
+        };
+        FieldDto: {
+            key: string;
+            label: string;
+            help: string;
+            default?: string;
+        };
+        GatewayTypeResponse: {
+            type: string;
+            label: string;
+            description: string;
+            credentials: components["schemas"]["FieldDto"][];
+            config: components["schemas"]["FieldDto"][];
+            webhookNote: string;
+        };
+        GatewayResponse: {
+            id: string;
+            type: string;
+            name: string;
+            enabled: boolean;
+            /** @enum {string} */
+            mode: "test" | "live";
+            position: number;
+            config: {
+                [key: string]: string;
+            };
+            /** @description Last 4 characters of each saved credential */
+            credentialHints: {
+                [key: string]: string;
+            };
+            /** @description Enter this in the gateway dashboard */
+            webhookUrl: string;
+        };
+        CreateGatewayDto: {
+            name: string;
+            enabled: boolean;
+            /** @enum {string} */
+            mode: "test" | "live";
+            position: number;
+            config: {
+                [key: string]: string;
+            };
+            /** @description Leave a field blank to keep the saved value */
+            credentials: {
+                [key: string]: string;
+            };
+            /** @enum {string} */
+            type: "paystack" | "flutterwave";
+        };
+        GatewayDto: {
+            name: string;
+            enabled: boolean;
+            /** @enum {string} */
+            mode: "test" | "live";
+            position: number;
+            config: {
+                [key: string]: string;
+            };
+            /** @description Leave a field blank to keep the saved value */
+            credentials: {
+                [key: string]: string;
+            };
+        };
+        TestResultResponse: {
+            ok: boolean;
+            message: string;
+        };
+        PaymentListItem: {
+            id: string;
+            reference: string;
+            checkoutId: string;
+            provider: string;
+            gatewayId?: string | null;
+            amountMinor: string;
+            currency: string;
+            status: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PaymentOptionResponse: {
+            id: string;
+            name: string;
+            type: string;
+        };
+        StartPaymentDto: {
+            gatewayId: string;
+        };
+        StartedPaymentResponse: {
+            reference: string;
+            /** @description Send the customer here to pay */
+            redirectUrl: string;
+        };
+        VerifyResponse: {
+            /** @enum {string} */
+            status: "initiated" | "succeeded" | "failed" | "requires_review" | "partially_refunded" | "refunded";
+            checkoutId: string;
         };
     };
     responses: never;
@@ -1336,6 +1636,65 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    adminListSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingGroupResponse"][];
+                };
+            };
+        };
+    };
+    adminUpdateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSettingsDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    storePublicSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSettingsResponse"];
+                };
             };
         };
     };
@@ -2703,6 +3062,199 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CheckoutResponse"];
+                };
+            };
+        };
+    };
+    adminListGatewayTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GatewayTypeResponse"][];
+                };
+            };
+        };
+    };
+    adminListGateways: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GatewayResponse"][];
+                };
+            };
+        };
+    };
+    adminCreateGateway: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGatewayDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GatewayResponse"];
+                };
+            };
+        };
+    };
+    adminUpdateGateway: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GatewayDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GatewayResponse"];
+                };
+            };
+        };
+    };
+    adminTestGateway: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestResultResponse"];
+                };
+            };
+        };
+    };
+    adminListPayments: {
+        parameters: {
+            query?: {
+                status?: "initiated" | "succeeded" | "failed" | "requires_review" | "partially_refunded" | "refunded";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentListItem"][];
+                };
+            };
+        };
+    };
+    storePaymentOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentOptionResponse"][];
+                };
+            };
+        };
+    };
+    storeStartPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartPaymentDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartedPaymentResponse"];
+                };
+            };
+        };
+    };
+    storeVerifyPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reference: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifyResponse"];
                 };
             };
         };

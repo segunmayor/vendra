@@ -4,7 +4,7 @@ import { SiteHeader } from '../../components/site-header';
 import { session } from '../../lib/session';
 import { signOut } from '../login/actions';
 
-export const metadata: Metadata = { title: 'My account · Vendra' };
+export const metadata: Metadata = { title: 'My account' };
 
 export default async function AccountPage() {
   const profile = await session.requireProfile();

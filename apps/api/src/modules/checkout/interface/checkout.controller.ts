@@ -77,6 +77,7 @@ export class CheckoutResponse {
   @ApiProperty({ type: MoneyDto }) delivery!: MoneyDto;
   @ApiProperty({ type: MoneyDto }) total!: MoneyDto;
   @ApiProperty({ description: 'Stock is held until this time' }) expiresAt!: Date;
+  @ApiProperty({ description: 'Paid, but an item sold out before payment arrived. Staff will refund.' }) stockIssue!: boolean;
 }
 
 export class LastAddressResponse {
@@ -106,6 +107,7 @@ function respond(session: CheckoutSession, now: Date): CheckoutResponse {
     delivery: money(state.delivery),
     total: money(state.total),
     expiresAt: state.expiresAt,
+    stockIssue: state.stockIssue ?? false,
   };
 }
 

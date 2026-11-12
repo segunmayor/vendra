@@ -5,7 +5,7 @@ import { session } from '../../../../lib/session';
 import { createCategory } from './actions';
 import { AttributeRows } from './attribute-rows';
 
-export const metadata: Metadata = { title: 'Categories · Vendra Admin' };
+export const metadata: Metadata = { title: 'Categories' };
 
 export default async function CategoriesPage() {
   const categories = await session.read((api) => api.GET('/v1/admin/categories'));

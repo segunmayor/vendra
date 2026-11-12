@@ -4,7 +4,7 @@ import { Payment, ProviderVerification } from './payment';
 const now = new Date('2026-11-11T10:00:00Z');
 const ngn = (minor: bigint) => Money.of(minor, 'NGN');
 const newPayment = () =>
-  Payment.initiate({ id: 'p1', orderId: 'o1', reference: 'ref1', provider: 'test', amount: ngn(10_000n) });
+  Payment.initiate({ id: 'p1', checkoutId: 'o1', reference: 'ref1', provider: 'test', amount: ngn(10_000n) });
 const result = (over: Partial<ProviderVerification> = {}): ProviderVerification => ({
   outcome: 'succeeded',
   amount: ngn(10_000n),
@@ -16,7 +16,7 @@ const types = (payment: Payment) => payment.pullEvents().map((event) => event.ty
 describe('Payment', () => {
   it('rejects a non-positive amount', () => {
     expect(() =>
-      Payment.initiate({ id: 'p', orderId: 'o', reference: 'r', provider: 't', amount: ngn(0n) }),
+      Payment.initiate({ id: 'p', checkoutId: 'o', reference: 'r', provider: 't', amount: ngn(0n) }),
     ).toThrow('positive');
   });
 

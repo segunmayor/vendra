@@ -1,4 +1,4 @@
-import { safeNextPath } from '@vendra/portal-session/server';
+import { getPublicSettings, safeNextPath, text } from '@vendra/portal-session/server';
 import { Alert, AuthForm, Card, Wordmark } from '@vendra/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -6,11 +6,11 @@ import { redirect } from 'next/navigation';
 import { session } from '../../lib/session';
 import { signIn } from './actions';
 
-export const metadata: Metadata = { title: 'Sign in · Vendra' };
+export const metadata: Metadata = { title: 'Sign in' };
 
 const REASONS: Record<string, string> = {
   expired: 'Your session has ended. Please sign in again.',
-  unavailable: 'We could not reach Vendra to keep you signed in. Please sign in again.',
+  unavailable: 'We could not reach the store to keep you signed in. Please sign in again.',
 };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
@@ -21,7 +21,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <main className="grid min-h-screen place-items-center p-4">
       <Card className="w-full max-w-sm p-6">
-        <Link href="/"><Wordmark /></Link>
+        <Link href="/"><Wordmark name={text(await getPublicSettings(), 'store.name')} /></Link>
         <h1 className="mt-6 text-xl font-bold">Sign in</h1>
         <p className="mt-1 mb-6 text-sm text-muted">Welcome back.</p>
         {reason ? <div className="mb-4"><Alert tone="warning">{reason}</Alert></div> : null}

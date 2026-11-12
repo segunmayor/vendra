@@ -7,7 +7,7 @@ import { session } from '../../../../lib/session';
 import { createZone } from './actions';
 import { ZoneForm } from './zone-form';
 
-export const metadata: Metadata = { title: 'Delivery prices · Vendra Admin' };
+export const metadata: Metadata = { title: 'Delivery prices' };
 
 export default async function DeliveryPage() {
   const zones = await session.read((api) => api.GET('/v1/admin/delivery-zones'));

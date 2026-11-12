@@ -8,16 +8,16 @@ const base = { subject: 'acc', audience: 'store', issuer: 'vendra-api' };
 
 describe('JwtAccessTokenService', () => {
   it('round-trips valid claims', () => {
-    expect(service.verify(service.issue(claims).token, 'store')).toEqual(claims);
+    expect(service.verify(service.issue(claims, 900).token, 'store')).toEqual(claims);
   });
 
   it('expires after 15 minutes', () => {
-    const { expiresAt } = service.issue(claims);
+    const { expiresAt } = service.issue(claims, 900);
     expect(Math.round((expiresAt.getTime() - Date.now()) / 60_000)).toBe(15);
   });
 
   it.each(['admin', 'vendor'] as const)('rejects a store token on %s', (audience) => {
-    expect(service.verify(service.issue(claims).token, audience)).toBeNull();
+    expect(service.verify(service.issue(claims, 900).token, audience)).toBeNull();
   });
 
   it('rejects a token signed with another secret', () => {

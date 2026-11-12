@@ -17,13 +17,13 @@ const SCHEMA_AVAILABILITY = {
 } as const;
 
 const describe = (product: ProductDetail) =>
-  (product.description || `${product.name} on Vendra`).replace(/\s+/g, ' ').trim().slice(0, 160);
+  (product.description || product.name).replace(/\s+/g, ' ').trim().slice(0, 160);
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const product = await getProduct((await params).slug);
-  if (!product) return { title: 'Not found · Vendra' };
+  if (!product) return { title: 'Not found' };
   return {
-    title: `${product.name} · Vendra`,
+    title: `${product.name}`,
     description: describe(product),
     openGraph: { title: product.name, description: describe(product), images: product.images.slice(0, 1) },
   };

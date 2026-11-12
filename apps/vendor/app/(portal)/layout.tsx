@@ -1,3 +1,4 @@
+import { getPublicSettings, text } from '@vendra/portal-session/server';
 import { PortalShell, Wordmark } from '@vendra/ui';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
@@ -8,7 +9,7 @@ export default async function VendorLayout({ children }: { children: ReactNode }
   const profile = await session.requireProfile();
   return (
     <PortalShell
-      brand={<Wordmark suffix="Sellers" />}
+      brand={<Wordmark name={text(await getPublicSettings(), 'store.name')} suffix="Sellers" />}
       navigation={[{ label: 'Application', href: '/' }]}
       currentPath="/"
       renderLink={(item, props) => (

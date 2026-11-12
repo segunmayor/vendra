@@ -17,9 +17,14 @@ export interface ProviderVerification {
 
 export interface PaymentState {
   readonly id: string;
-  readonly orderId: string;
+  readonly checkoutId: string;
   readonly reference: string;
+  /** The gateway type, such as paystack. */
   readonly provider: string;
+  /** The configured gateway it went through. */
+  readonly gatewayId: string | null;
+  /** Where the customer pays. Reused if they come back to the same gateway. */
+  readonly redirectUrl: string | null;
   readonly amount: Money;
   readonly status: PaymentStatus;
   readonly providerTransactionId: string | null;
@@ -36,9 +41,10 @@ export class Payment extends AggregateRoot {
 
   static initiate(input: {
     id: string;
-    orderId: string;
+    checkoutId: string;
     reference: string;
     provider: string;
+    gatewayId?: string | null;
     amount: Money;
   }): Payment {
     if (!input.amount.isPositive()) {
@@ -46,6 +52,8 @@ export class Payment extends AggregateRoot {
     }
     return new Payment({
       ...input,
+      gatewayId: input.gatewayId ?? null,
+      redirectUrl: null,
       status: 'initiated',
       providerTransactionId: null,
       refunded: Money.zero(input.amount.currency),
@@ -60,6 +68,12 @@ export class Payment extends AggregateRoot {
   /** Called by the repository after a successful commit. */
   markSaved(): void {
     this.state = { ...this.state, version: this.state.version + 1 };
+  }
+
+  /** Records the gateway's checkout page once it has created one. */
+  attachRedirect(url: string): void {
+    if (this.state.status !== 'initiated') throw new DomainError('payment.not_open', 'This payment is no longer open');
+    this.state = { ...this.state, redirectUrl: url };
   }
 
   get snapshot(): PaymentState {
@@ -127,7 +141,7 @@ export class Payment extends AggregateRoot {
       aggregateId: this.state.id,
       occurredAt: now,
       payload: {
-        orderId: this.state.orderId,
+        checkoutId: this.state.checkoutId,
         amountMinor: amount.minor.toString(),
         currency: amount.currency,
       },
@@ -140,7 +154,7 @@ export class Payment extends AggregateRoot {
       aggregateId: this.state.id,
       occurredAt: now,
       payload: {
-        orderId: this.state.orderId,
+        checkoutId: this.state.checkoutId,
         reference: this.state.reference,
         outcome: result.outcome,
         providerTransactionId: result.providerTransactionId,

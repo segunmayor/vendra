@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { isUuid, STATUS_TONE } from '../../../../lib/catalogue';
 import { session } from '../../../../lib/session';
 
-export const metadata: Metadata = { title: 'Products · Vendra Admin' };
+export const metadata: Metadata = { title: 'Products' };
 
 const PAGE_SIZE = 50;
 const STATUSES = ['draft', 'published', 'archived'] as const;
@@ -37,7 +37,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     <>
       <PageHeader
         title="Products"
-        description="Everything Vendra sells. A product goes on sale once it is published and has an active, stocked listing."
+        description="Everything the store sells. A product goes on sale once it is published and has an active, stocked listing."
         actions={
           <Link href="/catalogue/products/new" className={buttonVariants({ size: 'sm' })}>
             Add product

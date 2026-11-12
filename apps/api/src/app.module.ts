@@ -8,12 +8,15 @@ import { CatalogueModule } from './modules/catalogue/catalogue.module';
 import { CheckoutModule } from './modules/checkout/checkout.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
+import { LedgerModule } from './modules/ledger/ledger.module';
 import { ListingsModule } from './modules/listings/listings.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { SettingsModule } from './modules/settings/settings.module';
 import { LogisticsModule } from './modules/logistics/logistics.module';
 import { StorefrontModule } from './modules/storefront/storefront.module';
 
 @Module({
-  imports: [PlatformModule, IdentityModule, CatalogueModule, ListingsModule, InventoryModule, StorefrontModule, CartModule, LogisticsModule, CheckoutModule],
+  imports: [PlatformModule, SettingsModule, IdentityModule, CatalogueModule, ListingsModule, InventoryModule, StorefrontModule, CartModule, LogisticsModule, CheckoutModule, PaymentsModule, LedgerModule],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: ProblemDetailsFilter }],
 })

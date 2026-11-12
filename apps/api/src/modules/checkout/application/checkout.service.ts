@@ -1,6 +1,7 @@
 import { ApplicationError, DomainError, Money, Principal } from '../../../shared-kernel';
 import { CartPricing, CartService, CURRENCY } from '../../cart';
-import { InventoryCommands, RESERVATION_MINUTES } from '../../inventory';
+import { InsufficientStock, InventoryCommands } from '../../inventory';
+import { SettingsReader } from '../../settings';
 import { LogisticsService } from '../../logistics';
 import { CheckoutLine, CheckoutSession, DeliveryAddress, parseAddress } from '../domain/checkout-session';
 
@@ -38,6 +39,7 @@ export class CheckoutService {
     private readonly inventory: InventoryCommands,
     private readonly ids: { uuid(): string },
     private readonly clock: { now(): Date },
+    private readonly settings: SettingsReader,
   ) {}
 
   /** The delivery fee and total for the customer's basket, before anything is reserved. */
@@ -79,7 +81,7 @@ export class CheckoutService {
       address,
       delivery: quote.price,
       weightGrams: priced.weightGrams,
-      expiresAt: new Date(now.getTime() + RESERVATION_MINUTES * 60_000),
+      expiresAt: new Date(now.getTime() + (await this.settings.get('shopping.holdMinutes')) * 60_000),
       lines: priced.lines.map(
         (line): CheckoutLine => ({
           listingId: line.listingId,
@@ -135,6 +137,51 @@ export class CheckoutService {
 
   now(): Date {
     return this.clock.now();
+  }
+
+  /** For payments: what to charge. Only an open, unexpired checkout of this customer can be paid. */
+  async payable(customerId: string, checkoutId: string): Promise<{ id: string; total: Money }> {
+    const session = await this.sessions.findById(checkoutId);
+    if (!session || session.snapshot.customerId !== customerId) throw notFound();
+    if (!session.isOpenAt(this.clock.now())) {
+      throw new ApplicationError('conflict', 'checkout.not_payable', 'This checkout is no longer open. Return to your basket to try again.');
+    }
+    return { id: session.snapshot.id, total: session.snapshot.total };
+  }
+
+  async ownerOf(checkoutId: string): Promise<string | null> {
+    return (await this.sessions.findById(checkoutId))?.snapshot.customerId ?? null;
+  }
+
+  /**
+   * Reacts to a verified payment. Safe to run more than once. Commits the held stock as a sale,
+   * re-reserving it first if the hold lapsed while the customer was paying. If the stock has
+   * since sold, the session is still marked paid, flagged for staff to refund.
+   */
+  async markPaid(checkoutId: string, paymentId: string): Promise<void> {
+    const session = await this.sessions.findById(checkoutId);
+    if (!session) throw new Error(`Paid checkout ${checkoutId} not found`);
+    if (session.snapshot.status === 'paid') return;
+
+    const lines = session.snapshot.lines.map((line) => ({ listingId: line.listingId, quantity: line.quantity }));
+    let stockIssue = false;
+    if (!(await this.inventory.hasCommitted(checkoutId))) {
+      const held = new Map((await this.inventory.held(checkoutId)).map((hold) => [hold.listingId, hold.quantity]));
+      const covered = lines.every((line) => (held.get(line.listingId) ?? 0) >= line.quantity);
+      if (!covered) {
+        await this.inventory.release(checkoutId);
+        try {
+          await this.inventory.reserve(checkoutId, lines);
+        } catch (error) {
+          if (!(error instanceof InsufficientStock)) throw error;
+          stockIssue = true;
+        }
+      }
+      if (!stockIssue) await this.inventory.commit(checkoutId);
+    }
+    if (session.markPaid(paymentId, stockIssue)) await this.sessions.update(session);
+    // The purchased items leave the basket; anything added since stays.
+    await this.carts.removePurchased(session.snapshot.customerId, lines);
   }
 
   /**

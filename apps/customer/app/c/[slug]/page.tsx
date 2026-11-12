@@ -15,8 +15,8 @@ async function findCategory(slug: string) {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const found = await findCategory((await params).slug);
-  if (!found) return { title: 'Not found · Vendra' };
-  return { title: `${found.category.name} · Vendra`, description: `Shop ${found.category.name} on Vendra with clear prices and tracked delivery.` };
+  if (!found) return { title: 'Not found' };
+  return { title: `${found.category.name}`, description: `Shop ${found.category.name} with clear prices and tracked delivery.` };
 }
 
 export default async function CategoryPage({ params, searchParams }: Props) {

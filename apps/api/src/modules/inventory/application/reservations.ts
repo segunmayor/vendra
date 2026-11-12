@@ -1,7 +1,7 @@
 import { ApplicationError } from '../../../shared-kernel';
-import { Allocation, allocate, normalizeLines, RequestedLine, RESERVATION_MINUTES, Shortfall, StockRow } from '../domain/reservation';
+import { SettingsReader } from '../../settings';
+import { Allocation, allocate, normalizeLines, RequestedLine, Shortfall, StockRow } from '../domain/reservation';
 
-export { MAX_UNITS_PER_LISTING, RESERVATION_MINUTES } from '../domain/reservation';
 export type { RequestedLine, Shortfall } from '../domain/reservation';
 
 export interface HeldReservation {
@@ -25,6 +25,9 @@ export interface ReservationStore {
     decide: (stock: readonly StockRow[]) => Allocation[],
   ): Promise<{ created: boolean; held: HeldReservation[] }>;
   release(checkoutId: string): Promise<number>;
+  /** Turns held units into a sale: on-hand and reserved both fall, and a sale movement is recorded. */
+  commit(checkoutId: string, now: Date): Promise<HeldReservation[]>;
+  hasCommitted(checkoutId: string): Promise<boolean>;
   releaseExpired(now: Date, limit: number): Promise<number>;
   held(checkoutId: string): Promise<HeldReservation[]>;
 }
@@ -47,16 +50,19 @@ export class InventoryCommands {
   constructor(
     private readonly store: ReservationStore,
     private readonly clock: { now(): Date },
+    private readonly settings: SettingsReader,
   ) {}
 
   /**
-   * Holds stock for a checkout, all or nothing, for RESERVATION_MINUTES.
+   * Holds stock for a checkout, all or nothing, until `expiresAt` (by default the
+   * shopping.holdMinutes setting from now).
    * Calling again for the same checkout returns the existing holds and reserves nothing more.
    */
   async reserve(checkoutId: string, lines: readonly RequestedLine[], expiresAt?: Date): Promise<{ created: boolean; held: HeldReservation[] }> {
-    const wanted = normalizeLines(lines);
+    const [maxPerListing, holdMinutes] = await this.settings.getMany(['shopping.maxQuantityPerItem', 'shopping.holdMinutes'] as const);
+    const wanted = normalizeLines(lines, maxPerListing);
     const now = this.clock.now();
-    const until = expiresAt ?? new Date(now.getTime() + RESERVATION_MINUTES * 60_000);
+    const until = expiresAt ?? new Date(now.getTime() + holdMinutes * 60_000);
     return this.store.reserve(
       checkoutId,
       wanted.map((line) => line.listingId),
@@ -73,6 +79,15 @@ export class InventoryCommands {
   /** Returns held stock to sale. Safe to call twice, or after expiry. */
   release(checkoutId: string): Promise<number> {
     return this.store.release(checkoutId);
+  }
+
+  /** Records the sale of a paid checkout's held stock. Safe to repeat: it commits nothing twice. */
+  commit(checkoutId: string): Promise<HeldReservation[]> {
+    return this.store.commit(checkoutId, this.clock.now());
+  }
+
+  hasCommitted(checkoutId: string): Promise<boolean> {
+    return this.store.hasCommitted(checkoutId);
   }
 
   /** Releases lapsed holds in batches. Returns the number released. */

@@ -6,16 +6,17 @@ import { redirect } from 'next/navigation';
 import { randomUUID } from 'node:crypto';
 import { SiteHeader } from '../../components/site-header';
 import { readCart } from '../../lib/cart';
+import { getPublicSettings, text } from '@vendra/portal-session/server';
 import { session } from '../../lib/session';
 import { STATES } from '../../lib/states';
 import { checkDelivery, startCheckout } from './actions';
 
-export const metadata: Metadata = { title: 'Checkout · Vendra', robots: { index: false } };
+export const metadata: Metadata = { title: 'Checkout', robots: { index: false } };
 
 
 export default async function CheckoutPage() {
   await session.requireProfile();
-  const [cart, last] = await Promise.all([readCart(), session.read((api) => api.GET('/v1/store/checkout/last-address'))]);
+  const [cart, last, store] = await Promise.all([readCart(), session.read((api) => api.GET('/v1/store/checkout/last-address')), getPublicSettings()]);
   if (!cart.canCheckout) redirect('/cart');
   const address = last.address;
 
@@ -106,7 +107,7 @@ export default async function CheckoutPage() {
                 </SubmitButton>
               </ActionForm>
             </Card>
-            <Alert tone="warning">Pay only on Vendra. Our riders never ask for payment at the door.</Alert>
+            {text(store, 'store.paymentSafetyNote') ? <Alert tone="warning">{text(store, 'store.paymentSafetyNote')}</Alert> : null}
           </div>
         </div>
       </main>

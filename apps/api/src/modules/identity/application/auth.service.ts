@@ -1,4 +1,5 @@
 import { ApplicationError, Audience, DomainError, Principal } from '../../../shared-kernel';
+import { SettingsReader } from '../../settings';
 import { Account, assertPasswordAllowed, normalizeEmail } from '../domain/account';
 import {
   AccessTokenService,
@@ -14,17 +15,6 @@ import {
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
-
-/** Absolute lifetimes. Rotating a token never extends them. */
-const SESSION_LIFETIME_MS: Record<Audience, number> = {
-  store: 30 * DAY,
-  vendor: 14 * DAY,
-  admin: 12 * HOUR,
-};
-
-export const THROTTLE_WINDOW_MS = 15 * 60_000;
-export const EMAIL_FAILURE_LIMIT = 5;
-export const IP_FAILURE_LIMIT = 100;
 
 export interface IssuedSession {
   readonly accountId: string;
@@ -59,10 +49,18 @@ export class AuthService {
     private readonly throttle: LoginThrottle,
     private readonly audit: AuditTrail,
     private readonly clock: Clock,
+    private readonly settings: SettingsReader,
   ) {}
 
+  /** Absolute session lifetime for new sessions. Rotating a token never extends it. */
+  private async sessionLifetimeMs(audience: Audience): Promise<number> {
+    if (audience === 'store') return (await this.settings.get('security.customerSessionDays')) * DAY;
+    if (audience === 'vendor') return (await this.settings.get('security.vendorSessionDays')) * DAY;
+    return (await this.settings.get('security.staffSessionHours')) * HOUR;
+  }
+
   async register(audience: Exclude<Audience, 'admin'>, email: string, password: string): Promise<IssuedSession> {
-    assertPasswordAllowed(password);
+    assertPasswordAllowed(password, await this.settings.get('security.passwordMinLength'));
     const now = this.clock.now();
     const account = Account.register({
       id: this.secrets.uuid(),
@@ -87,12 +85,17 @@ export class AuthService {
 
     const emailKey = `email:${audience}:${email}`;
     const ipKey = `ip:${ip}`;
+    const [perAccount, perAddress, pauseMinutes] = await this.settings.getMany([
+      'security.failedSignInsPerAccount',
+      'security.failedSignInsPerAddress',
+      'security.signInPauseMinutes',
+    ] as const);
     const blocked = await this.throttle.isBlocked(
       [
-        { key: emailKey, limit: EMAIL_FAILURE_LIMIT },
-        { key: ipKey, limit: IP_FAILURE_LIMIT },
+        { key: emailKey, limit: perAccount },
+        { key: ipKey, limit: perAddress },
       ],
-      new Date(now.getTime() - THROTTLE_WINDOW_MS),
+      new Date(now.getTime() - pauseMinutes * 60_000),
     );
     if (blocked) {
       throw new ApplicationError('rate_limited', 'auth.too_many_attempts', 'Too many attempts. Try again later.');
@@ -130,6 +133,11 @@ export class AuthService {
       });
     }
     return issued;
+  }
+
+  /** For other modules, such as payments, that need a customer's email address. */
+  async emailOf(accountId: string): Promise<string | null> {
+    return (await this.accounts.findById(accountId))?.snapshot.email ?? null;
   }
 
   async refresh(audience: Audience, refreshToken: string): Promise<IssuedSession> {
@@ -192,7 +200,7 @@ export class AuthService {
 
   /** Signs out every device, including the current one. */
   async changePassword(principal: Principal, current: string, next: string): Promise<void> {
-    assertPasswordAllowed(next);
+    assertPasswordAllowed(next, await this.settings.get('security.passwordMinLength'));
     const account = await this.accounts.findById(principal.accountId);
     if (!account) throw sessionInvalid();
     if (!(await this.hasher.verify(account.snapshot.passwordHash, current))) throw invalidCredentials();
@@ -226,14 +234,17 @@ export class AuthService {
       accountId,
       familyId: this.secrets.uuid(),
       refreshTokenHash: this.secrets.hashToken(token),
-      expiresAt: new Date(now.getTime() + SESSION_LIFETIME_MS[audience]),
+      expiresAt: new Date(now.getTime() + (await this.sessionLifetimeMs(audience))),
     };
     await this.sessions.create(session);
     return this.issue(session, token, audience);
   }
 
-  private issue(session: NewSession, refreshToken: string, audience: Audience): IssuedSession {
-    const access = this.tokens.issue({ accountId: session.accountId, sessionId: session.id, audience });
+  private async issue(session: NewSession, refreshToken: string, audience: Audience): Promise<IssuedSession> {
+    const access = this.tokens.issue(
+      { accountId: session.accountId, sessionId: session.id, audience },
+      (await this.settings.get('security.accessTokenMinutes')) * 60,
+    );
     return {
       accountId: session.accountId,
       accessToken: access.token,

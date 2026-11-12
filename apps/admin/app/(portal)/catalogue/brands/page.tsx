@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { text, toFormState } from '../../../../lib/forms';
 import { session } from '../../../../lib/session';
 
-export const metadata: Metadata = { title: 'Brands · Vendra Admin' };
+export const metadata: Metadata = { title: 'Brands' };
 
 async function createBrand(_state: FormState, data: FormData): Promise<FormState> {
   'use server';

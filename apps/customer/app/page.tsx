@@ -2,10 +2,11 @@ import Link from 'next/link';
 import { ProductGrid } from '../components/catalogue';
 import { SiteHeader } from '../components/site-header';
 import { EmptyState } from '@vendra/ui';
+import { getPublicSettings, text } from '@vendra/portal-session/server';
 import { listCategories, listProducts } from '../lib/catalogue';
 
 export default async function HomePage() {
-  const [result, categories] = await Promise.all([listProducts({ limit: 8 }), listCategories()]);
+  const [result, categories, store] = await Promise.all([listProducts({ limit: 8 }), listCategories(), getPublicSettings()]);
   const latest = typeof result === 'string' ? null : result;
   const top = categories.filter((category) => category.parentId === null);
   return (
@@ -13,8 +14,8 @@ export default async function HomePage() {
       <SiteHeader />
       <main className="mx-auto max-w-6xl px-4 py-10">
         <section className="rounded-brand bg-primary px-6 py-12 text-primary-foreground md:px-12 md:py-16">
-          <h1 className="max-w-xl text-3xl font-extrabold tracking-tight md:text-5xl">Everything you need, delivered with confidence.</h1>
-          <p className="mt-4 max-w-lg text-base opacity-90">Clear prices, verified payments and delivery you can follow from checkout to your door.</p>
+          <h1 className="max-w-xl text-3xl font-extrabold tracking-tight md:text-5xl">{text(store, 'store.heroTitle')}</h1>
+          <p className="mt-4 max-w-lg text-base opacity-90">{text(store, 'store.heroSubtitle')}</p>
           <Link href="/products" className="mt-6 inline-block rounded-full bg-accent px-6 py-3 text-sm font-bold text-accent-foreground">
             Start shopping
           </Link>

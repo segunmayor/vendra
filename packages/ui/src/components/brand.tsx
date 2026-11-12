@@ -1,10 +1,11 @@
 import type { HTMLAttributes, ReactNode } from 'react';
 import { cn } from '../cn';
 
-export function Wordmark({ suffix, className }: { suffix?: string; className?: string }) {
+/** The store name as typeset text. The name comes from the store.name setting. */
+export function Wordmark({ name, suffix, className }: { name: string; suffix?: string; className?: string }) {
   return (
     <span className={cn('inline-flex items-baseline gap-2 text-xl font-extrabold tracking-tight text-primary', className)}>
-      Vendra
+      {name}
       {suffix ? <span className="text-sm font-medium text-muted">{suffix}</span> : null}
     </span>
   );

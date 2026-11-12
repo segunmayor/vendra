@@ -3,7 +3,9 @@ export type ApplicationErrorKind =
   | 'forbidden'
   | 'not_found'
   | 'conflict'
-  | 'rate_limited';
+  | 'rate_limited'
+  /** An outside service, such as a payment gateway, could not be reached or refused us. */
+  | 'unavailable';
 
 /** A use case refused a request. `code` is stable and safe to return to API clients. */
 export class ApplicationError extends Error {

@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { text, toFormState } from '../../../../lib/forms';
 import { session } from '../../../../lib/session';
 
-export const metadata: Metadata = { title: 'Warehouses · Vendra Admin' };
+export const metadata: Metadata = { title: 'Warehouses' };
 
 const STATES = [
   'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno', 'Cross River', 'Delta', 'Ebonyi', 'Edo',
@@ -28,7 +28,7 @@ export default async function WarehousesPage() {
   const warehouses = await session.read((api) => api.GET('/v1/admin/warehouses'));
   return (
     <>
-      <PageHeader title="Warehouses" description="Where Vendra holds stock. Record stock from each product's page." />
+      <PageHeader title="Warehouses" description="Where stock is held. Record stock from each product's page." />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {warehouses.length === 0 ? (
           <EmptyState title="No warehouses yet">Add the location that holds the opening stock.</EmptyState>

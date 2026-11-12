@@ -5,7 +5,6 @@ import { Audience } from '../../../shared-kernel';
 import { AccessClaims, AccessTokenService, PasswordHasher, Secrets } from '../application/ports';
 
 const ISSUER = 'vendra-api';
-const ACCESS_TTL_SECONDS = 15 * 60;
 
 export class Argon2PasswordHasher implements PasswordHasher {
   // The library's default algorithm is Argon2id. These are OWASP's minimum settings.
@@ -27,15 +26,15 @@ export class Argon2PasswordHasher implements PasswordHasher {
 export class JwtAccessTokenService implements AccessTokenService {
   constructor(private readonly secret: string) {}
 
-  issue(claims: AccessClaims): { token: string; expiresAt: Date } {
+  issue(claims: AccessClaims, ttlSeconds: number): { token: string; expiresAt: Date } {
     const token = jwt.sign({ sid: claims.sessionId }, this.secret, {
       algorithm: 'HS256',
       subject: claims.accountId,
       audience: claims.audience,
       issuer: ISSUER,
-      expiresIn: ACCESS_TTL_SECONDS,
+      expiresIn: ttlSeconds,
     });
-    return { token, expiresAt: new Date(Date.now() + ACCESS_TTL_SECONDS * 1000) };
+    return { token, expiresAt: new Date(Date.now() + ttlSeconds * 1000) };
   }
 
   verify(token: string, audience: Audience): AccessClaims | null {

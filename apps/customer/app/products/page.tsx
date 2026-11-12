@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { ProductResults } from '../../components/product-results';
 import { SiteHeader } from '../../components/site-header';
 
-export const metadata: Metadata = { title: 'All products · Vendra' };
+export const metadata: Metadata = { title: 'All products' };
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const { cursor } = await searchParams;

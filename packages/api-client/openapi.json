@@ -48,6 +48,86 @@
         ]
       }
     },
+    "/v1/admin/settings": {
+      "get": {
+        "operationId": "adminListSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SettingGroupResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin settings"
+        ]
+      },
+      "put": {
+        "operationId": "adminUpdateSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Changes several settings at once. All are validated before any is saved.",
+        "tags": [
+          "admin settings"
+        ]
+      }
+    },
+    "/v1/store/settings": {
+      "get": {
+        "operationId": "storePublicSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSettingsResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "",
+        "tags": [
+          "store settings"
+        ]
+      }
+    },
     "/v1/store/auth/login": {
       "post": {
         "operationId": "storeLogin",
@@ -2270,6 +2350,342 @@
           "store checkout"
         ]
       }
+    },
+    "/v1/admin/payment-gateways/types": {
+      "get": {
+        "operationId": "adminListGatewayTypes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GatewayTypeResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin payments"
+        ]
+      }
+    },
+    "/v1/admin/payment-gateways": {
+      "get": {
+        "operationId": "adminListGateways",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GatewayResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin payments"
+        ]
+      },
+      "post": {
+        "operationId": "adminCreateGateway",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGatewayDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin payments"
+        ]
+      }
+    },
+    "/v1/admin/payment-gateways/{id}": {
+      "put": {
+        "operationId": "adminUpdateGateway",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GatewayDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin payments"
+        ]
+      }
+    },
+    "/v1/admin/payment-gateways/{id}/test": {
+      "post": {
+        "operationId": "adminTestGateway",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestResultResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Checks the saved credentials with the gateway",
+        "tags": [
+          "admin payments"
+        ]
+      }
+    },
+    "/v1/admin/payments": {
+      "get": {
+        "operationId": "adminListPayments",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "initiated",
+                "succeeded",
+                "failed",
+                "requires_review",
+                "partially_refunded",
+                "refunded"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PaymentListItem"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin payments"
+        ]
+      }
+    },
+    "/v1/store/payment-options": {
+      "get": {
+        "operationId": "storePaymentOptions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PaymentOptionResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "store payments"
+        ]
+      }
+    },
+    "/v1/store/checkout/{id}/payments": {
+      "post": {
+        "operationId": "storeStartPayment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartPaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartedPaymentResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Starts payment for an open checkout. Repeating it reuses the same payment.",
+        "tags": [
+          "store payments"
+        ]
+      }
+    },
+    "/v1/store/payments/{reference}/verify": {
+      "post": {
+        "operationId": "storeVerifyPayment",
+        "parameters": [
+          {
+            "name": "reference",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Asks the gateway for the payment result. Call on return from the gateway.",
+        "tags": [
+          "store payments"
+        ]
+      }
     }
   },
   "info": {
@@ -2299,6 +2715,170 @@
         },
         "required": [
           "status"
+        ]
+      },
+      "SettingResponse": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "integer",
+              "decimal",
+              "text",
+              "longtext",
+              "email",
+              "phone",
+              "url",
+              "boolean"
+            ]
+          },
+          "value": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "defaultValue": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "public": {
+            "type": "boolean"
+          },
+          "min": {
+            "type": "number"
+          },
+          "max": {
+            "type": "number"
+          },
+          "step": {
+            "type": "number"
+          },
+          "maxLength": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "optional": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "description",
+          "kind",
+          "value",
+          "defaultValue",
+          "isDefault",
+          "public"
+        ]
+      },
+      "SettingGroupResponse": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "settings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SettingResponse"
+            }
+          }
+        },
+        "required": [
+          "group",
+          "label",
+          "description",
+          "settings"
+        ]
+      },
+      "UpdateSettingsDto": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "example": {
+              "shopping.holdMinutes": 20
+            }
+          }
+        },
+        "required": [
+          "values"
+        ]
+      },
+      "PublicSettingsResponse": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "values"
         ]
       },
       "CredentialsDto": {
@@ -3905,6 +4485,10 @@
             "format": "date-time",
             "type": "string",
             "description": "Stock is held until this time"
+          },
+          "stockIssue": {
+            "type": "boolean",
+            "description": "Paid, but an item sold out before payment arrived. Staff will refund."
           }
         },
         "required": [
@@ -3915,7 +4499,8 @@
           "subtotal",
           "delivery",
           "total",
-          "expiresAt"
+          "expiresAt",
+          "stockIssue"
         ]
       },
       "LastAddressResponse": {
@@ -3931,6 +4516,340 @@
             ]
           }
         }
+      },
+      "FieldDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "help": {
+            "type": "string"
+          },
+          "default": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "help"
+        ]
+      },
+      "GatewayTypeResponse": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "credentials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldDto"
+            }
+          },
+          "config": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldDto"
+            }
+          },
+          "webhookNote": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "label",
+          "description",
+          "credentials",
+          "config",
+          "webhookNote"
+        ]
+      },
+      "GatewayResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "config": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "credentialHints": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Last 4 characters of each saved credential"
+          },
+          "webhookUrl": {
+            "type": "string",
+            "description": "Enter this in the gateway dashboard"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "name",
+          "enabled",
+          "mode",
+          "position",
+          "config",
+          "credentialHints",
+          "webhookUrl"
+        ]
+      },
+      "CreateGatewayDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "config": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "credentials": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Leave a field blank to keep the saved value"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "paystack",
+              "flutterwave"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "enabled",
+          "mode",
+          "position",
+          "config",
+          "credentials",
+          "type"
+        ]
+      },
+      "GatewayDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "config": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "credentials": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Leave a field blank to keep the saved value"
+          }
+        },
+        "required": [
+          "name",
+          "enabled",
+          "mode",
+          "position",
+          "config",
+          "credentials"
+        ]
+      },
+      "TestResultResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "message"
+        ]
+      },
+      "PaymentListItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "checkoutId": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "gatewayId": {
+            "type": "string",
+            "nullable": true
+          },
+          "amountMinor": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "checkoutId",
+          "provider",
+          "amountMinor",
+          "currency",
+          "status",
+          "createdAt"
+        ]
+      },
+      "PaymentOptionResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type"
+        ]
+      },
+      "StartPaymentDto": {
+        "type": "object",
+        "properties": {
+          "gatewayId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "gatewayId"
+        ]
+      },
+      "StartedPaymentResponse": {
+        "type": "object",
+        "properties": {
+          "reference": {
+            "type": "string"
+          },
+          "redirectUrl": {
+            "type": "string",
+            "description": "Send the customer here to pay"
+          }
+        },
+        "required": [
+          "reference",
+          "redirectUrl"
+        ]
+      },
+      "VerifyResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "initiated",
+              "succeeded",
+              "failed",
+              "requires_review",
+              "partially_refunded",
+              "refunded"
+            ]
+          },
+          "checkoutId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "checkoutId"
+        ]
       }
     }
   }

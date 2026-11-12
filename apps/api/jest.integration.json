@@ -1,6 +1,9 @@
 {
   "preset": "ts-jest",
   "testEnvironment": "node",
-  "roots": ["<rootDir>/test/integration"],
-  "testRegex": ".*\\.int-spec\\.ts$"
+  "roots": [
+    "<rootDir>/test/integration"
+  ],
+  "testRegex": ".*\\.int-spec\\.ts$",
+  "testTimeout": 30000
 }

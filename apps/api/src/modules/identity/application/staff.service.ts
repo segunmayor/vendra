@@ -1,4 +1,5 @@
 import { ApplicationError, DomainError, Principal } from '../../../shared-kernel';
+import { SettingsReader } from '../../settings';
 import { Account, assertPasswordAllowed } from '../domain/account';
 import { isPermission, PERMISSIONS } from '../domain/permissions';
 import {
@@ -28,6 +29,7 @@ export class StaffService {
     private readonly secrets: Secrets,
     private readonly audit: AuditTrail,
     private readonly clock: Clock,
+    private readonly settings: SettingsReader,
   ) {}
 
   listPermissions(): readonly string[] {
@@ -70,7 +72,7 @@ export class StaffService {
     password: string,
     roleIds: readonly string[],
   ): Promise<{ id: string }> {
-    assertPasswordAllowed(password);
+    assertPasswordAllowed(password, await this.settings.get('security.passwordMinLength'));
     const unique = await this.loadGrantableRoles(actor, roleIds);
     const account = Account.register({
       id: this.secrets.uuid(),
@@ -118,7 +120,7 @@ export class StaffService {
 
   /** Creates the first administrator. Refuses once any staff account exists. */
   async bootstrapSuperAdmin(email: string, password: string): Promise<{ id: string }> {
-    assertPasswordAllowed(password);
+    assertPasswordAllowed(password, await this.settings.get('security.passwordMinLength'));
     if ((await this.accounts.countByAudience('admin')) > 0) {
       throw new ApplicationError('conflict', 'staff.already_bootstrapped', 'Staff accounts already exist');
     }

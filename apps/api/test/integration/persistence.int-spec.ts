@@ -21,7 +21,7 @@ const ngn = (minor: bigint) => Money.of(minor, 'NGN');
 const newPayment = (amount = ngn(10_000n)) =>
   Payment.initiate({
     id: randomUUID(),
-    orderId: randomUUID(),
+    checkoutId: randomUUID(),
     reference: `ref_${randomUUID()}`,
     provider: 'test',
     amount,
@@ -39,7 +39,15 @@ beforeAll(async () => {
   if (!row || !/test/.test(row.db)) throw new Error(`Refusing to run against database: ${row?.db}`);
 });
 
-afterAll(() => prisma.$disconnect());
+afterAll(async () => {
+  // These payments belong to no real checkout. Mark their events delivered so other suites'
+  // reactions (which would rightly fail on a missing checkout) never pick them up.
+  await prisma.outboxEvent.updateMany({
+    where: { publishedAt: null, type: { startsWith: 'Payment' }, occurredAt: new Date('2026-11-11T10:00:00Z') },
+    data: { publishedAt: new Date() },
+  });
+  await prisma.$disconnect();
+});
 
 describe('PrismaPaymentRepository', () => {
   const repo = new PrismaPaymentRepository(prisma);
@@ -103,7 +111,7 @@ describe('PrismaPaymentRepository', () => {
     await repo.save(original);
     const clash = Payment.initiate({
       id: randomUUID(),
-      orderId: randomUUID(),
+      checkoutId: randomUUID(),
       reference: original.snapshot.reference,
       provider: 'test',
       amount: ngn(10_000n),
@@ -164,6 +172,7 @@ describe('ProcessPaymentWebhook against the database', () => {
       name: 'test',
       initialize: jest.fn(),
       refund: jest.fn(),
+    testConnection: jest.fn(),
       verify,
       parseWebhook: () => ({ eventId, reference }),
     };

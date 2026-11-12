@@ -5,7 +5,7 @@ import { SiteHeader } from '../../components/site-header';
 export async function generateMetadata({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }): Promise<Metadata> {
   const { q } = await searchParams;
   // Search result pages are thin, duplicate content, so keep them out of search engines.
-  return { title: q ? `“${q.slice(0, 60)}” · Vendra` : 'Search · Vendra', robots: { index: false, follow: true } };
+  return { title: q ? `“${q.slice(0, 60)}”` : 'Search', robots: { index: false, follow: true } };
 }
 
 export default async function SearchPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {

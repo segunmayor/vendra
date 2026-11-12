@@ -1,5 +1,6 @@
 import { ApplicationError, ConcurrencyConflict, Principal } from '../../../shared-kernel';
-import { Cart, CartOwner } from '../domain/cart';
+import { SettingsReader } from '../../settings';
+import { Cart, CartLimits, CartOwner } from '../domain/cart';
 import { CartPricing, PricedCart } from './pricing';
 
 export interface CartRepository {
@@ -36,7 +37,13 @@ export class CartService {
     private readonly pricing: CartPricing,
     private readonly tokens: CartTokens,
     private readonly ids: { uuid(): string },
+    private readonly settings: SettingsReader,
   ) {}
+
+  private async limits(): Promise<CartLimits> {
+    const [maxQuantity, maxLines] = await this.settings.getMany(['shopping.maxQuantityPerItem', 'shopping.maxBasketLines'] as const);
+    return { maxQuantity, maxLines };
+  }
 
   async view(caller: CartCaller): Promise<PricedCart> {
     const cart = await this.find(caller);
@@ -49,19 +56,37 @@ export class CartService {
   }
 
   async add(caller: CartCaller, listingId: string, quantity: number): Promise<CartResult> {
+    const limits = await this.limits();
     return this.mutate(caller, async (cart) => {
       const wanted = cart.quantityOf(listingId) + quantity;
       await this.assertCanHold(listingId, wanted);
-      cart.add(listingId, quantity);
+      cart.add(listingId, quantity, limits);
     });
   }
 
   async set(caller: CartCaller, listingId: string, quantity: number): Promise<CartResult> {
+    const limits = await this.limits();
     return this.mutate(caller, async (cart) => {
       // Lowering a quantity or removing a line is always allowed, even if the item went off sale.
       if (quantity > cart.quantityOf(listingId)) await this.assertCanHold(listingId, quantity);
-      cart.set(listingId, quantity);
+      cart.set(listingId, quantity, limits);
     });
+  }
+
+  /** After payment: takes the bought quantities out of the customer's cart. */
+  async removePurchased(customerId: string, bought: readonly { listingId: string; quantity: number }[]): Promise<void> {
+    const limits = await this.limits();
+    for (let attempt = 1; ; attempt += 1) {
+      const cart = await this.carts.findByCustomer(customerId);
+      if (!cart) return;
+      for (const line of bought) cart.set(line.listingId, Math.max(0, cart.quantityOf(line.listingId) - line.quantity), { ...limits, maxQuantity: Number.MAX_SAFE_INTEGER });
+      try {
+        await this.carts.save(cart);
+        return;
+      } catch (error) {
+        if (!(error instanceof ConcurrencyConflict) || attempt >= ATTEMPTS) throw error;
+      }
+    }
   }
 
   /** Moves a guest cart into the customer's cart when they sign in. Safe to repeat. */
@@ -70,7 +95,7 @@ export class CartService {
       const guest = await this.carts.findByTokenHash(this.tokens.hash(guestToken));
       const mine = (await this.carts.findByCustomer(principal.accountId)) ?? Cart.open(this.ids.uuid(), { kind: 'customer', customerId: principal.accountId });
       if (!guest) return { ...(await this.pricing.price(mine.snapshot.lines)), capped: false };
-      const { capped } = mine.absorb(guest);
+      const { capped } = mine.absorb(guest, await this.limits());
       try {
         await this.carts.save(mine);
         await this.carts.delete(guest);

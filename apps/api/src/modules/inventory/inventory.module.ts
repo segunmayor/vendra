@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, Module, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { ENV, Env } from '../../platform/config/env';
+import { SettingsReader } from '../settings';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../platform/prisma/prisma.service';
 import { ListingQueries } from '../listings';
@@ -56,8 +57,9 @@ class ReservationSweeper implements OnApplicationBootstrap, OnApplicationShutdow
     },
     {
       provide: InventoryCommands,
-      inject: [PrismaService],
-      useFactory: (prisma: PrismaService) => new InventoryCommands(new PrismaReservationStore(prisma), { now: () => new Date() }),
+      inject: [PrismaService, SettingsReader],
+      useFactory: (prisma: PrismaService, settings: SettingsReader) =>
+        new InventoryCommands(new PrismaReservationStore(prisma), { now: () => new Date() }, settings),
     },
     ReservationSweeper,
     {
