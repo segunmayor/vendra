@@ -16,7 +16,7 @@ export type SettingDefinition =
   | (Base & { readonly kind: 'email' | 'phone' | 'url'; readonly default: string; readonly optional?: boolean })
   | (Base & { readonly kind: 'boolean'; readonly default: boolean });
 
-export type SettingGroup = 'store' | 'shopping' | 'search' | 'security' | 'payments';
+export type SettingGroup = 'store' | 'shopping' | 'search' | 'security' | 'payments' | 'vendors';
 
 export const GROUPS: Record<SettingGroup, { label: string; description: string }> = {
   store: { label: 'Store', description: 'Name, contact details and the words customers see.' },
@@ -24,6 +24,7 @@ export const GROUPS: Record<SettingGroup, { label: string; description: string }
   search: { label: 'Search', description: 'How forgiving search is of spelling mistakes.' },
   security: { label: 'Sign-in and security', description: 'Password rules, sign-in limits and how long people stay signed in.' },
   payments: { label: 'Payments and accounting', description: 'Where customers return after paying, and how payments are recorded in the ledger.' },
+  vendors: { label: 'Seller applications', description: 'Whether businesses can apply to sell, and what they must send for verification.' },
 };
 
 export const SETTINGS = {
@@ -57,6 +58,14 @@ export const SETTINGS = {
   'payments.ledgerPrepaymentAccount': { group: 'payments', kind: 'text', maxLength: 20, default: '2100', label: 'Ledger account for customer prepayments', description: 'Credited when a payment succeeds, until the order is delivered. Debited when the order is delivered or a refund is confirmed.' },
   'payments.ledgerSalesAccount': { group: 'payments', kind: 'text', maxLength: 20, default: '4000', label: 'Ledger account for sales', description: 'Credited with the price of the items when an order is delivered.' },
   'payments.ledgerDeliveryIncomeAccount': { group: 'payments', kind: 'text', maxLength: 20, default: '4100', label: 'Ledger account for delivery charges', description: 'Credited with the delivery charge when an order is delivered.' },
+
+  'vendors.applicationsOpen': { group: 'vendors', kind: 'boolean', default: true, label: 'Accept new seller applications', description: 'When off, businesses can still sign in and finish applications they started, but cannot start new ones.' },
+  'vendors.requireRegistrationCertificate': { group: 'vendors', kind: 'boolean', default: true, label: 'Require the CAC registration certificate', description: '' },
+  'vendors.requireOwnerId': { group: 'vendors', kind: 'boolean', default: true, label: "Require the owner or director's ID", description: 'For example a national ID card, international passport or driver\'s licence.' },
+  'vendors.requireProofOfAddress': { group: 'vendors', kind: 'boolean', default: true, label: 'Require proof of business address', description: 'For example a recent utility bill.' },
+  'vendors.requireTaxCertificate': { group: 'vendors', kind: 'boolean', default: false, label: 'Require the TIN certificate', description: '' },
+  'vendors.maxDocumentMb': { group: 'vendors', kind: 'integer', min: 1, max: 10, default: 5, unit: 'MB', label: 'Largest document file', description: 'PDF or photo. 10 MB is the most the system accepts.' },
+  'vendors.approvedMessage': { group: 'vendors', kind: 'longtext', maxLength: 500, default: 'Your business is verified. Selling opens soon, and we will contact you when you can add products.', label: 'Message to approved sellers', description: 'Shown on the seller portal once an application is approved.' },
 } as const satisfies Record<string, SettingDefinition>;
 
 export type SettingKey = keyof typeof SETTINGS;

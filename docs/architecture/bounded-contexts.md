@@ -8,7 +8,7 @@ Each aggregate has exactly one owner. Other modules hold its ID and call the own
 | --- | --- | --- | --- |
 | `identity` | Account, Session, Role, Permission | Register, authenticate, authorize | Full |
 | `customers` | CustomerProfile, Address | Manage profile and address book | Full |
-| `vendors` | Seller, VerificationCase | Apply, verify, approve | Registration and verification |
+| `vendors` | Seller (as SellerApplication), VerificationCase, SellerDocument | Apply, verify, approve | Registration and verification ([details](seller-verification.md)) |
 | `catalogue` | Category, Brand, Product, ProductVariant, attributes | Define what can be sold, search published products | Full |
 | `listings` | Listing | A seller's offer: price and status for a variant | Vendra seller only |
 | `inventory` | StockItem, StockReservation, StockMovement | Reserve, release, commit, adjust | Full |

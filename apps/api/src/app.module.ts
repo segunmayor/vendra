@@ -16,9 +16,10 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { LogisticsModule } from './modules/logistics/logistics.module';
 import { ShippingModule } from './modules/shipping/shipping.module';
 import { StorefrontModule } from './modules/storefront/storefront.module';
+import { VendorsModule } from './modules/vendors/vendors.module';
 
 @Module({
-  imports: [PlatformModule, SettingsModule, IdentityModule, CatalogueModule, ListingsModule, InventoryModule, StorefrontModule, CartModule, LogisticsModule, CheckoutModule, PaymentsModule, LedgerModule, OrdersModule, ShippingModule],
+  imports: [PlatformModule, SettingsModule, IdentityModule, CatalogueModule, ListingsModule, InventoryModule, StorefrontModule, CartModule, LogisticsModule, CheckoutModule, PaymentsModule, LedgerModule, OrdersModule, ShippingModule, VendorsModule],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: ProblemDetailsFilter }],
 })

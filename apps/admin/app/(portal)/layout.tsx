@@ -17,6 +17,7 @@ const NAVIGATION: readonly (NavItem & { permission?: string })[] = [
   { label: 'Brands', href: '/catalogue/brands', permission: 'catalogue.manage' },
   { label: 'Warehouses', href: '/inventory/warehouses', permission: 'inventory.manage' },
   { label: 'Payments', href: '/payments', permission: 'payments.read' },
+  { label: 'Sellers', href: '/sellers', permission: 'vendors.approve' },
   { label: 'Delivery prices', href: '/settings/delivery', permission: 'settings.manage' },
   { label: 'Payment gateways', href: '/settings/payments', permission: 'settings.manage' },
   { label: 'Settings', href: '/settings/general', permission: 'settings.manage' },

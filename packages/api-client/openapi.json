@@ -3490,6 +3490,449 @@
           "store orders"
         ]
       }
+    },
+    "/v1/vendor/application": {
+      "get": {
+        "operationId": "vendorMyApplication",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyApplicationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Your seller application, and what it needs",
+        "tags": [
+          "vendor application"
+        ]
+      },
+      "put": {
+        "operationId": "vendorSaveApplication",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveDetailsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start your application, or change its details",
+        "tags": [
+          "vendor application"
+        ]
+      }
+    },
+    "/v1/vendor/application/documents": {
+      "post": {
+        "operationId": "vendorAddDocument",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Attach a verification document (PDF or photo)",
+        "tags": [
+          "vendor application"
+        ]
+      }
+    },
+    "/v1/vendor/application/documents/{documentId}": {
+      "delete": {
+        "operationId": "vendorRemoveDocument",
+        "parameters": [
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "vendor application"
+        ]
+      },
+      "get": {
+        "operationId": "vendorDownloadDocument",
+        "parameters": [
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "vendor application"
+        ]
+      }
+    },
+    "/v1/vendor/application/submit": {
+      "post": {
+        "operationId": "vendorSubmitApplication",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send your application for verification",
+        "tags": [
+          "vendor application"
+        ]
+      }
+    },
+    "/v1/admin/sellers": {
+      "get": {
+        "operationId": "adminListSellerApplications",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "draft",
+                "pending_verification",
+                "changes_requested",
+                "active",
+                "rejected"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ApplicationResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Seller applications. Filtered by status, longest waiting first.",
+        "tags": [
+          "admin sellers"
+        ]
+      }
+    },
+    "/v1/admin/sellers/counts": {
+      "get": {
+        "operationId": "adminSellerCounts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellerCountsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin sellers"
+        ]
+      }
+    },
+    "/v1/admin/sellers/{id}": {
+      "get": {
+        "operationId": "adminGetSellerApplication",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffApplicationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin sellers"
+        ]
+      }
+    },
+    "/v1/admin/sellers/{id}/documents/{documentId}": {
+      "get": {
+        "operationId": "adminDownloadSellerDocument",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin sellers"
+        ]
+      }
+    },
+    "/v1/admin/sellers/{id}/review": {
+      "post": {
+        "operationId": "adminReviewSellerApplication",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffApplicationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve, reject, or ask for changes",
+        "tags": [
+          "admin sellers"
+        ]
+      }
     }
   },
   "info": {
@@ -6746,6 +7189,628 @@
           "status",
           "items",
           "history"
+        ]
+      },
+      "BusinessAddressDto": {
+        "type": "object",
+        "properties": {
+          "line1": {
+            "type": "string"
+          },
+          "line2": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "Abia",
+              "Adamawa",
+              "Akwa Ibom",
+              "Anambra",
+              "Bauchi",
+              "Bayelsa",
+              "Benue",
+              "Borno",
+              "Cross River",
+              "Delta",
+              "Ebonyi",
+              "Edo",
+              "Ekiti",
+              "Enugu",
+              "FCT",
+              "Gombe",
+              "Imo",
+              "Jigawa",
+              "Kaduna",
+              "Kano",
+              "Katsina",
+              "Kebbi",
+              "Kogi",
+              "Kwara",
+              "Lagos",
+              "Nasarawa",
+              "Niger",
+              "Ogun",
+              "Ondo",
+              "Osun",
+              "Oyo",
+              "Plateau",
+              "Rivers",
+              "Sokoto",
+              "Taraba",
+              "Yobe",
+              "Zamfara"
+            ]
+          }
+        },
+        "required": [
+          "line1",
+          "city",
+          "state"
+        ]
+      },
+      "ProfileDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "description": "The name customers will see"
+          },
+          "legalName": {
+            "type": "string",
+            "description": "As on the CAC certificate"
+          },
+          "businessKind": {
+            "type": "string",
+            "enum": [
+              "company",
+              "business_name"
+            ]
+          },
+          "registrationNumber": {
+            "type": "string",
+            "example": "RC1234567"
+          },
+          "taxId": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "example": "+2348031234567"
+          },
+          "address": {
+            "$ref": "#/components/schemas/BusinessAddressDto"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "displayName",
+          "legalName",
+          "businessKind",
+          "registrationNumber",
+          "phone",
+          "address"
+        ]
+      },
+      "DocumentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "registration_certificate",
+              "owner_id",
+              "proof_of_address",
+              "tax_certificate",
+              "other"
+            ]
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "number"
+          },
+          "uploadedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "fileName",
+          "contentType",
+          "sizeBytes",
+          "uploadedAt"
+        ]
+      },
+      "DecisionDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "submitted",
+              "approved",
+              "rejected",
+              "changes_requested"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "at"
+        ]
+      },
+      "ApplicationResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "pending_verification",
+              "changes_requested",
+              "active",
+              "rejected"
+            ]
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfileDto"
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentDto"
+            }
+          },
+          "missingDocuments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "registration_certificate",
+                "owner_id",
+                "proof_of_address",
+                "tax_certificate",
+                "other"
+              ]
+            }
+          },
+          "editable": {
+            "type": "boolean"
+          },
+          "submittedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "decision": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DecisionDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "version": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "profile",
+          "documents",
+          "missingDocuments",
+          "editable",
+          "createdAt",
+          "version"
+        ]
+      },
+      "RequirementsDto": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "boolean",
+            "description": "Whether new applications are accepted"
+          },
+          "requiredDocuments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "registration_certificate",
+                "owner_id",
+                "proof_of_address",
+                "tax_certificate",
+                "other"
+              ]
+            }
+          },
+          "documentKinds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "registration_certificate",
+                "owner_id",
+                "proof_of_address",
+                "tax_certificate",
+                "other"
+              ]
+            }
+          },
+          "maxDocumentBytes": {
+            "type": "number"
+          },
+          "approvedMessage": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "open",
+          "requiredDocuments",
+          "documentKinds",
+          "maxDocumentBytes",
+          "approvedMessage"
+        ]
+      },
+      "MyApplicationResponse": {
+        "type": "object",
+        "properties": {
+          "application": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ApplicationResponse"
+              }
+            ]
+          },
+          "requirements": {
+            "$ref": "#/components/schemas/RequirementsDto"
+          }
+        },
+        "required": [
+          "requirements"
+        ]
+      },
+      "SaveDetailsDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "description": "The name customers will see"
+          },
+          "legalName": {
+            "type": "string",
+            "description": "As on the CAC certificate"
+          },
+          "businessKind": {
+            "type": "string",
+            "enum": [
+              "company",
+              "business_name"
+            ]
+          },
+          "registrationNumber": {
+            "type": "string",
+            "example": "RC1234567"
+          },
+          "taxId": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "example": "+2348031234567"
+          },
+          "address": {
+            "$ref": "#/components/schemas/BusinessAddressDto"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "number",
+            "description": "The version you were looking at"
+          }
+        },
+        "required": [
+          "displayName",
+          "legalName",
+          "businessKind",
+          "registrationNumber",
+          "phone",
+          "address"
+        ]
+      },
+      "UploadDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "registration_certificate",
+              "owner_id",
+              "proof_of_address",
+              "tax_certificate",
+              "other"
+            ]
+          },
+          "file": {
+            "type": "string",
+            "format": "binary"
+          }
+        },
+        "required": [
+          "kind",
+          "file"
+        ]
+      },
+      "SubmitDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number"
+          }
+        }
+      },
+      "SellerCountsResponse": {
+        "type": "object",
+        "properties": {
+          "draft": {
+            "type": "number"
+          },
+          "pending_verification": {
+            "type": "number"
+          },
+          "changes_requested": {
+            "type": "number"
+          },
+          "active": {
+            "type": "number"
+          },
+          "rejected": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "draft",
+          "pending_verification",
+          "changes_requested",
+          "active",
+          "rejected"
+        ]
+      },
+      "CaseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "submitted",
+              "approved",
+              "rejected",
+              "changes_requested"
+            ]
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfileDto"
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentDto"
+            }
+          },
+          "submittedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "reviewedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "profile",
+          "documents",
+          "submittedAt"
+        ]
+      },
+      "SameRegistrationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "pending_verification",
+              "changes_requested",
+              "active",
+              "rejected"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "status"
+        ]
+      },
+      "StaffApplicationResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "pending_verification",
+              "changes_requested",
+              "active",
+              "rejected"
+            ]
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfileDto"
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentDto"
+            }
+          },
+          "missingDocuments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "registration_certificate",
+                "owner_id",
+                "proof_of_address",
+                "tax_certificate",
+                "other"
+              ]
+            }
+          },
+          "editable": {
+            "type": "boolean"
+          },
+          "submittedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "decision": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DecisionDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "version": {
+            "type": "number"
+          },
+          "ownerAccountId": {
+            "type": "string"
+          },
+          "ownerEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "cases": {
+            "description": "Newest first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseDto"
+            }
+          },
+          "sameRegistration": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SameRegistrationDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "profile",
+          "documents",
+          "missingDocuments",
+          "editable",
+          "createdAt",
+          "version",
+          "ownerAccountId",
+          "cases",
+          "sameRegistration"
+        ]
+      },
+      "ReviewDto": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "reject",
+              "request_changes"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "description": "Required to reject or ask for changes. The applicant reads it."
+          },
+          "version": {
+            "type": "number",
+            "description": "The version you were looking at"
+          }
+        },
+        "required": [
+          "decision"
         ]
       }
     }

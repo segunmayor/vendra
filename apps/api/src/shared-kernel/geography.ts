@@ -11,3 +11,11 @@ export type NigerianState = (typeof NIGERIAN_STATES)[number];
 export function isNigerianState(value: string): value is NigerianState {
   return (NIGERIAN_STATES as readonly string[]).includes(value);
 }
+
+const MOBILE = /^(?:\+?234|0)([789][01]\d{8})$/;
+
+/** A Nigerian mobile number as +234…, or null. Accepts 0803 123 4567, +2348031234567 and similar. */
+export function nigerianMobile(raw: string): string | null {
+  const match = MOBILE.exec(raw.replace(/[\s-]/g, ''));
+  return match ? `+234${match[1]}` : null;
+}

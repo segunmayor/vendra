@@ -230,15 +230,26 @@ enum SellerType {
 }
 
 model Seller {
-  id           String             @id @default(uuid()) @db.Uuid
-  type         SellerType
-  displayName  String
-  legalName    String
-  status       String             @default("pending_verification")
-  ownerAccount String?            @db.Uuid
-  createdAt    DateTime           @default(now()) @db.Timestamptz
-  cases        VerificationCase[]
+  id                 String             @id @default(uuid()) @db.Uuid
+  type               SellerType
+  displayName        String
+  legalName          String
+  status             String             @default("pending_verification")
+  ownerAccount       String?            @db.Uuid
+  businessKind       String?
+  registrationNumber String?
+  taxId              String?
+  phone              String?
+  address            Json?
+  description        String?
+  version            Int                @default(0)
+  createdAt          DateTime           @default(now()) @db.Timestamptz
+  updatedAt          DateTime           @default(now()) @updatedAt @db.Timestamptz
+  cases              VerificationCase[]
+  documents          SellerDocument[]
 
+  @@index([type, status])
+  @@index([registrationNumber], map: "sellers_registration_number_idx")
   @@map("sellers")
   @@schema("sellers")
 }
@@ -247,6 +258,7 @@ model VerificationCase {
   id         String    @id @default(uuid()) @db.Uuid
   sellerId   String    @db.Uuid
   status     String    @default("submitted")
+  /// What was submitted: { profile, documentIds }.
   documents  Json
   reviewedBy String?   @db.Uuid
   reviewedAt DateTime? @db.Timestamptz
@@ -255,7 +267,27 @@ model VerificationCase {
   seller     Seller    @relation(fields: [sellerId], references: [id])
 
   @@index([sellerId])
+  @@index([sellerId, createdAt], map: "verification_cases_seller_created_idx")
   @@map("verification_cases")
+  @@schema("sellers")
+}
+
+/// Verification documents. Kept in the database at launch (low volume, no file store chosen yet).
+model SellerDocument {
+  id          String    @id @db.Uuid
+  sellerId    String    @db.Uuid
+  kind        String
+  fileName    String
+  contentType String
+  sizeBytes   Int
+  sha256      String
+  content     Bytes
+  uploadedAt  DateTime  @db.Timestamptz
+  removedAt   DateTime? @db.Timestamptz
+  seller      Seller    @relation(fields: [sellerId], references: [id])
+
+  @@index([sellerId])
+  @@map("seller_documents")
   @@schema("sellers")
 }
 

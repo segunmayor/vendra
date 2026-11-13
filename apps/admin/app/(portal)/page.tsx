@@ -13,17 +13,18 @@ function Tile({ href, count, label, note, urgent }: { href: string; count: numbe
 }
 
 export default async function DashboardPage() {
-  const [catalogue, orders, payments, shipping] = await Promise.all([can('catalogue.manage'), can('orders.manage'), can('payments.read'), can('shipments.manage')]);
-  const [counts, review, failed] = await Promise.all([
+  const [catalogue, orders, payments, shipping, vendors] = await Promise.all([can('catalogue.manage'), can('orders.manage'), can('payments.read'), can('shipments.manage'), can('vendors.approve')]);
+  const [counts, review, failed, sellers] = await Promise.all([
     orders ? session.read((api) => api.GET('/v1/admin/orders/counts')) : null,
     payments ? session.read((api) => api.GET('/v1/admin/payments', { params: { query: { status: 'requires_review' } } })) : null,
     shipping ? session.read((api) => api.GET('/v1/admin/shipments', { params: { query: { status: 'delivery_failed' } } })) : null,
+    vendors ? session.read((api) => api.GET('/v1/admin/sellers/counts')) : null,
   ]);
 
   return (
     <>
       <PageHeader title="Dashboard" />
-      {counts || review || failed ? (
+      {counts || review || failed || sellers ? (
         <section aria-labelledby="attention" className="mb-8">
           <h2 id="attention" className="mb-3 text-lg font-semibold">
             Needs attention
@@ -38,6 +39,9 @@ export default async function DashboardPage() {
             ) : null}
             {review ? (
               <Tile href="/payments?status=requires_review" count={review.length} label="Payments to review" note="The gateway reported a different amount. No order was placed." urgent />
+            ) : null}
+            {sellers ? (
+              <Tile href="/sellers?status=pending_verification" count={sellers.pending_verification} label="Seller applications to review" note="Businesses waiting for their details and documents to be checked." />
             ) : null}
           </div>
         </section>

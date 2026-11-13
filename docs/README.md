@@ -11,6 +11,7 @@ Vendra is a Nigerian multi-category retail and marketplace platform owned by Dat
 | [Settings and payment gateways](architecture/settings-and-payments.md) | What staff configure in Admin, and how payments are taken and verified |
 | [Cart and checkout](architecture/cart-and-checkout.md) | Baskets, delivery pricing, stock holds and their expiry |
 | [Dispatch and tracking](architecture/dispatch-and-tracking.md) | Sending orders, delivery steps, what customers see, and the ledger entry on delivery |
+| [Seller verification](architecture/seller-verification.md) | How businesses apply to sell, the documents they send, and how staff verify them |
 | [Bounded contexts](architecture/bounded-contexts.md) | Module ownership of aggregates and operations |
 | [Data ownership](architecture/data-ownership.md) | Database strategy, money, migrations |
 | [Payments and logistics](architecture/payments-and-logistics.md) | Provider-independent payment and shipment design |

@@ -1389,6 +1389,156 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/vendor/application": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your seller application, and what it needs */
+        get: operations["vendorMyApplication"];
+        /** Start your application, or change its details */
+        put: operations["vendorSaveApplication"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/vendor/application/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Attach a verification document (PDF or photo) */
+        post: operations["vendorAddDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/vendor/application/documents/{documentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["vendorDownloadDocument"];
+        put?: never;
+        post?: never;
+        delete: operations["vendorRemoveDocument"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/vendor/application/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send your application for verification */
+        post: operations["vendorSubmitApplication"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/sellers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Seller applications. Filtered by status, longest waiting first. */
+        get: operations["adminListSellerApplications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/sellers/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminSellerCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/sellers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminGetSellerApplication"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/sellers/{id}/documents/{documentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminDownloadSellerDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/sellers/{id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve, reject, or ask for changes */
+        post: operations["adminReviewSellerApplication"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2221,6 +2371,152 @@ export interface components {
             trackingReference?: string | null;
             items: components["schemas"]["ShipmentItemDto"][];
             history: components["schemas"]["StatusChangeDto"][];
+        };
+        BusinessAddressDto: {
+            line1: string;
+            line2?: string | null;
+            city: string;
+            /** @enum {string} */
+            state: "Abia" | "Adamawa" | "Akwa Ibom" | "Anambra" | "Bauchi" | "Bayelsa" | "Benue" | "Borno" | "Cross River" | "Delta" | "Ebonyi" | "Edo" | "Ekiti" | "Enugu" | "FCT" | "Gombe" | "Imo" | "Jigawa" | "Kaduna" | "Kano" | "Katsina" | "Kebbi" | "Kogi" | "Kwara" | "Lagos" | "Nasarawa" | "Niger" | "Ogun" | "Ondo" | "Osun" | "Oyo" | "Plateau" | "Rivers" | "Sokoto" | "Taraba" | "Yobe" | "Zamfara";
+        };
+        ProfileDto: {
+            /** @description The name customers will see */
+            displayName: string;
+            /** @description As on the CAC certificate */
+            legalName: string;
+            /** @enum {string} */
+            businessKind: "company" | "business_name";
+            /** @example RC1234567 */
+            registrationNumber: string;
+            taxId?: string | null;
+            /** @example +2348031234567 */
+            phone: string;
+            address: components["schemas"]["BusinessAddressDto"];
+            description?: string | null;
+        };
+        DocumentDto: {
+            id: string;
+            /** @enum {string} */
+            kind: "registration_certificate" | "owner_id" | "proof_of_address" | "tax_certificate" | "other";
+            fileName: string;
+            contentType: string;
+            sizeBytes: number;
+            /** Format: date-time */
+            uploadedAt: string;
+        };
+        DecisionDto: {
+            /** @enum {string} */
+            status: "submitted" | "approved" | "rejected" | "changes_requested";
+            note?: string | null;
+            /** Format: date-time */
+            at: string;
+        };
+        ApplicationResponse: {
+            id: string;
+            /** @enum {string} */
+            status: "draft" | "pending_verification" | "changes_requested" | "active" | "rejected";
+            profile: components["schemas"]["ProfileDto"];
+            documents: components["schemas"]["DocumentDto"][];
+            missingDocuments: ("registration_certificate" | "owner_id" | "proof_of_address" | "tax_certificate" | "other")[];
+            editable: boolean;
+            /** Format: date-time */
+            submittedAt?: string | null;
+            decision?: components["schemas"]["DecisionDto"] | null;
+            /** Format: date-time */
+            createdAt: string;
+            version: number;
+        };
+        RequirementsDto: {
+            /** @description Whether new applications are accepted */
+            open: boolean;
+            requiredDocuments: ("registration_certificate" | "owner_id" | "proof_of_address" | "tax_certificate" | "other")[];
+            documentKinds: ("registration_certificate" | "owner_id" | "proof_of_address" | "tax_certificate" | "other")[];
+            maxDocumentBytes: number;
+            approvedMessage: string;
+        };
+        MyApplicationResponse: {
+            application?: components["schemas"]["ApplicationResponse"] | null;
+            requirements: components["schemas"]["RequirementsDto"];
+        };
+        SaveDetailsDto: {
+            /** @description The name customers will see */
+            displayName: string;
+            /** @description As on the CAC certificate */
+            legalName: string;
+            /** @enum {string} */
+            businessKind: "company" | "business_name";
+            /** @example RC1234567 */
+            registrationNumber: string;
+            taxId?: string | null;
+            /** @example +2348031234567 */
+            phone: string;
+            address: components["schemas"]["BusinessAddressDto"];
+            description?: string | null;
+            /** @description The version you were looking at */
+            version?: number;
+        };
+        UploadDto: {
+            /** @enum {string} */
+            kind: "registration_certificate" | "owner_id" | "proof_of_address" | "tax_certificate" | "other";
+            /** Format: binary */
+            file: string;
+        };
+        SubmitDto: {
+            version?: number;
+        };
+        SellerCountsResponse: {
+            draft: number;
+            pending_verification: number;
+            changes_requested: number;
+            active: number;
+            rejected: number;
+        };
+        CaseDto: {
+            id: string;
+            /** @enum {string} */
+            status: "submitted" | "approved" | "rejected" | "changes_requested";
+            profile: components["schemas"]["ProfileDto"];
+            documents: components["schemas"]["DocumentDto"][];
+            /** Format: date-time */
+            submittedAt: string;
+            reviewedBy?: string | null;
+            /** Format: date-time */
+            reviewedAt?: string | null;
+            notes?: string | null;
+        };
+        SameRegistrationDto: {
+            id: string;
+            displayName: string;
+            /** @enum {string} */
+            status: "draft" | "pending_verification" | "changes_requested" | "active" | "rejected";
+        };
+        StaffApplicationResponse: {
+            id: string;
+            /** @enum {string} */
+            status: "draft" | "pending_verification" | "changes_requested" | "active" | "rejected";
+            profile: components["schemas"]["ProfileDto"];
+            documents: components["schemas"]["DocumentDto"][];
+            missingDocuments: ("registration_certificate" | "owner_id" | "proof_of_address" | "tax_certificate" | "other")[];
+            editable: boolean;
+            /** Format: date-time */
+            submittedAt?: string | null;
+            decision?: components["schemas"]["DecisionDto"] | null;
+            /** Format: date-time */
+            createdAt: string;
+            version: number;
+            ownerAccountId: string;
+            ownerEmail?: string | null;
+            /** @description Newest first */
+            cases: components["schemas"]["CaseDto"][];
+            sameRegistration: components["schemas"]["SameRegistrationDto"][];
+        };
+        ReviewDto: {
+            /** @enum {string} */
+            decision: "approve" | "reject" | "request_changes";
+            /** @description Required to reject or ask for changes. The applicant reads it. */
+            note?: string;
+            /** @description The version you were looking at */
+            version?: number;
         };
     };
     responses: never;
@@ -4348,6 +4644,250 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrackingResponse"][];
+                };
+            };
+        };
+    };
+    vendorMyApplication: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyApplicationResponse"];
+                };
+            };
+        };
+    };
+    vendorSaveApplication: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveDetailsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationResponse"];
+                };
+            };
+        };
+    };
+    vendorAddDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["UploadDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationResponse"];
+                };
+            };
+        };
+    };
+    vendorDownloadDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/webp": string;
+                };
+            };
+        };
+    };
+    vendorRemoveDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationResponse"];
+                };
+            };
+        };
+    };
+    vendorSubmitApplication: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationResponse"];
+                };
+            };
+        };
+    };
+    adminListSellerApplications: {
+        parameters: {
+            query?: {
+                status?: "draft" | "pending_verification" | "changes_requested" | "active" | "rejected";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationResponse"][];
+                };
+            };
+        };
+    };
+    adminSellerCounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SellerCountsResponse"];
+                };
+            };
+        };
+    };
+    adminGetSellerApplication: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffApplicationResponse"];
+                };
+            };
+        };
+    };
+    adminDownloadSellerDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                documentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/webp": string;
+                };
+            };
+        };
+    };
+    adminReviewSellerApplication: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffApplicationResponse"];
                 };
             };
         };
