@@ -1,7 +1,7 @@
-import { ApplicationError, Principal } from '../../../shared-kernel';
+import { ApplicationError, ConcurrencyConflict, Principal } from '../../../shared-kernel';
 import { CheckoutService, PaidCheckout } from '../../checkout';
 import { ListingQueries } from '../../listings';
-import { Order, OrderStatus } from '../domain/order';
+import { Order, OrderAddress, OrderStatus, SellerOrderStatus, ShipmentProgress } from '../domain/order';
 
 export interface OrderRepository {
   /** A new order number, unique and never reused. */
@@ -10,9 +10,22 @@ export interface OrderRepository {
   insert(order: Order): Promise<boolean>;
   findById(id: string): Promise<Order | null>;
   findByCheckout(checkoutId: string): Promise<Order | null>;
+  findBySellerOrder(sellerOrderId: string): Promise<Order | null>;
+  findBySellerOrders(sellerOrderIds: readonly string[]): Promise<Order[]>;
+  /** Saves status changes and events. Throws ConcurrencyConflict on a stale version. */
+  save(order: Order): Promise<void>;
   listForCustomer(customerId: string, limit: number): Promise<Order[]>;
-  listRecent(limit: number, filter: { status?: OrderStatus; number?: string }): Promise<Order[]>;
+  listRecent(limit: number, filter: OrderFilter): Promise<Order[]>;
   countByStatus(): Promise<Record<string, number>>;
+  /** Paid orders with items not yet handed to a courier. */
+  countToSend(): Promise<number>;
+}
+
+export interface OrderFilter {
+  readonly status?: OrderStatus;
+  readonly number?: string;
+  /** Only paid orders with items not yet handed to a courier. */
+  readonly toSend?: boolean;
 }
 
 export interface CustomerDirectory {
@@ -86,7 +99,7 @@ export class OrderService {
 
   // ---- staff ----
 
-  list(filter: { status?: OrderStatus; number?: string }): Promise<Order[]> {
+  list(filter: OrderFilter): Promise<Order[]> {
     return this.orders.listRecent(100, filter);
   }
 
@@ -96,9 +109,58 @@ export class OrderService {
     return { order, customerEmail: await this.customers.emailOf(order.snapshot.customerId) };
   }
 
+  /** For shipping: what one seller must send, and where. */
+  async sellerOrder(sellerOrderId: string): Promise<SellerOrderContext | null> {
+    const order = await this.orders.findBySellerOrder(sellerOrderId);
+    return order ? context(order, sellerOrderId) : null;
+  }
+
+  /** Staff: every seller order of an order. */
+  async sellerOrdersOf(orderId: string): Promise<SellerOrderContext[]> {
+    const order = await this.orders.findById(orderId);
+    if (!order) throw notFound();
+    return order.snapshot.sellerOrders.map((seller) => context(order, seller.id));
+  }
+
+  /** Customers: the seller orders of their own order only. */
+  async mySellerOrders(principal: Principal, orderId: string): Promise<SellerOrderContext[]> {
+    const order = await this.getMine(principal, orderId);
+    return order.snapshot.sellerOrders.map((seller) => context(order, seller.id));
+  }
+
+  async sellerOrders(sellerOrderIds: readonly string[]): Promise<SellerOrderContext[]> {
+    const wanted = new Set(sellerOrderIds);
+    return (await this.orders.findBySellerOrders([...wanted])).flatMap((order) =>
+      order.snapshot.sellerOrders.filter((seller) => wanted.has(seller.id)).map((seller) => context(order, seller.id)),
+    );
+  }
+
+  /** Throws a DomainError explaining why these items cannot be sent now. */
+  async assertShippable(sellerOrderId: string): Promise<void> {
+    const order = await this.orders.findBySellerOrder(sellerOrderId);
+    if (!order) throw notFound();
+    order.assertShippable(sellerOrderId);
+  }
+
+  /** Shipping's progress, from the outbox. Safe to repeat and to receive late. */
+  async applyShipmentStatus(sellerOrderId: string, progress: ShipmentProgress): Promise<void> {
+    for (let attempt = 1; ; attempt++) {
+      const order = await this.orders.findBySellerOrder(sellerOrderId);
+      if (!order) throw new Error(`Seller order ${sellerOrderId} not found`);
+      if (!order.applyShipmentStatus(sellerOrderId, progress, this.clock.now())) return;
+      try {
+        await this.orders.save(order);
+        return;
+      } catch (error) {
+        if (!(error instanceof ConcurrencyConflict) || attempt >= 5) throw error;
+      }
+    }
+  }
+
   /** How many orders are in each status, for the staff dashboard. */
-  counts(): Promise<Record<string, number>> {
-    return this.orders.countByStatus();
+  async counts(): Promise<{ byStatus: Record<string, number>; toSend: number }> {
+    const [byStatus, toSend] = await Promise.all([this.orders.countByStatus(), this.orders.countToSend()]);
+    return { byStatus, toSend };
   }
 
   private async linesWithSellers(checkout: PaidCheckout) {
@@ -122,4 +184,32 @@ export class OrderService {
 }
 
 export { Order } from '../domain/order';
-export type { OrderStatus } from '../domain/order';
+export type { OrderStatus, ShipmentProgress } from '../domain/order';
+
+export interface SellerOrderContext {
+  readonly orderId: string;
+  readonly orderNumber: string;
+  readonly orderStatus: OrderStatus;
+  readonly customerId: string;
+  readonly sellerOrderId: string;
+  readonly sellerId: string;
+  readonly status: SellerOrderStatus;
+  readonly address: OrderAddress;
+  readonly lines: readonly { readonly id: string; readonly productName: string; readonly sku: string; readonly quantity: number }[];
+}
+
+function context(order: Order, sellerOrderId: string): SellerOrderContext {
+  const state = order.snapshot;
+  const seller = state.sellerOrders.find((entry) => entry.id === sellerOrderId)!;
+  return {
+    orderId: state.id,
+    orderNumber: state.number,
+    orderStatus: state.status,
+    customerId: state.customerId,
+    sellerOrderId: seller.id,
+    sellerId: seller.sellerId,
+    status: seller.status,
+    address: state.address,
+    lines: seller.lines.map(({ id, productName, sku, quantity }) => ({ id, productName, sku, quantity })),
+  };
+}

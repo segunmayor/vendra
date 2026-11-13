@@ -3,7 +3,8 @@ import { AggregateRoot, DomainError, Money } from '../../../shared-kernel';
 /**
  * - placed: paid, waiting to be packed and sent.
  * - stock_issue: paid, but an item sold out before the payment arrived. Needs a refund.
- * - cancelled, fulfilled: set by later steps (staff cancellation, delivery).
+ * - fulfilled: every seller order delivered.
+ * - cancelled: reserved for staff cancellation (a later step).
  */
 export type OrderStatus = 'placed' | 'stock_issue' | 'cancelled' | 'fulfilled';
 export type SellerOrderStatus = 'pending' | 'cancelled' | 'dispatched' | 'delivered';
@@ -142,4 +143,61 @@ export class Order extends AggregateRoot {
   markSaved(): void {
     this.state = { ...this.state, version: this.state.version + 1 };
   }
+
+  /**
+   * Follows a seller order's delivery. Shipping sends these through the outbox, perhaps more
+   * than once and late, so each is applied only when it moves things forward. Returns true if
+   * anything changed. When every seller order is delivered, the order is fulfilled.
+   */
+  applyShipmentStatus(sellerOrderId: string, shipment: ShipmentProgress, now: Date): boolean {
+    const seller = this.state.sellerOrders.find((entry) => entry.id === sellerOrderId);
+    if (!seller) throw new DomainError('order.unknown_seller_order', 'This seller order is not part of the order');
+    const next = nextSellerStatus(seller.status, shipment);
+    if (next === seller.status) return false;
+
+    const sellerOrders = this.state.sellerOrders.map((entry) => (entry.id === sellerOrderId ? { ...entry, status: next } : entry));
+    const live = sellerOrders.filter((entry) => entry.status !== 'cancelled');
+    const fulfilled = this.state.status === 'placed' && live.length > 0 && live.every((entry) => entry.status === 'delivered');
+    this.state = { ...this.state, sellerOrders, status: fulfilled ? 'fulfilled' : this.state.status };
+    if (fulfilled) {
+      this.raise({
+        type: 'OrderFulfilled',
+        aggregateId: this.state.id,
+        occurredAt: now,
+        payload: {
+          orderId: this.state.id,
+          number: this.state.number,
+          paymentId: this.state.paymentId,
+          customerId: this.state.customerId,
+          subtotalMinor: this.state.subtotal.minor.toString(),
+          deliveryMinor: this.state.delivery.minor.toString(),
+          totalMinor: this.state.total.minor.toString(),
+          currency: this.state.total.currency,
+        },
+      });
+    }
+    return true;
+  }
+
+  /** Only a paid order with secured stock can be sent. */
+  assertShippable(sellerOrderId: string): void {
+    if (this.state.status !== 'placed') {
+      const why = this.state.status === 'stock_issue' ? 'it has a stock issue: refund it instead' : `it is ${this.state.status}`;
+      throw new DomainError('order.not_shippable', `This order cannot be sent because ${why}`);
+    }
+    const seller = this.state.sellerOrders.find((entry) => entry.id === sellerOrderId);
+    if (!seller) throw new DomainError('order.unknown_seller_order', 'This seller order is not part of the order');
+    if (seller.status !== 'pending') throw new DomainError('order.already_sent', `These items are already ${seller.status}`);
+  }
+}
+
+/** The shipment statuses that matter to an order. */
+export type ShipmentProgress = 'dispatched' | 'delivered' | 'back_to_pending';
+
+function nextSellerStatus(current: SellerOrderStatus, shipment: ShipmentProgress): SellerOrderStatus {
+  if (current === 'delivered' || current === 'cancelled') return current;
+  if (shipment === 'delivered') return 'delivered';
+  if (shipment === 'dispatched') return current === 'pending' ? 'dispatched' : current;
+  // A cancelled or returned shipment: the items are back with Vendra, ready to send again.
+  return current === 'dispatched' ? 'pending' : current;
 }

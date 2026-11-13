@@ -4,7 +4,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { can, session } from '../../../../lib/session';
-import { dateTime, ORDER_LABEL, ORDER_TONE, type OrderStatus, SELLER_LABEL } from '../labels';
+import { dateTime, orderBadge, SELLER_LABEL } from '../labels';
+import { Delivery } from './delivery';
 
 export const metadata: Metadata = { title: 'Order' };
 
@@ -12,7 +13,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const { id } = await params;
   const order = await session.find((api) => api.GET('/v1/admin/orders/{id}', { params: { path: { id } } }));
   if (!order) notFound();
-  const seePayment = await can('payments.read');
+  const [seePayment, mayShip, shipments] = await Promise.all([
+    can('payments.read'),
+    can('shipments.manage'),
+    session.read((api) => api.GET('/v1/admin/orders/{id}/shipments', { params: { path: { id } } })),
+  ]);
+  const badge = orderBadge(order);
   const money = (value: { amountMinor: string; currency: string }) => formatMoney(value.amountMinor, value.currency);
   const options = (values: Record<string, string>) => Object.entries(values).map(([key, value]) => `${key}: ${value}`).join(', ');
 
@@ -26,7 +32,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       <PageHeader
         title={`Order ${order.number}`}
         description={`Placed ${dateTime.format(new Date(order.placedAt))}.`}
-        actions={<Badge tone={ORDER_TONE[order.status as OrderStatus] ?? 'neutral'}>{ORDER_LABEL[order.status as OrderStatus] ?? order.status}</Badge>}
+        actions={<Badge tone={badge.tone}>{badge.label}</Badge>}
       />
       {order.status === 'stock_issue' ? (
         <div className="mb-6">
@@ -64,6 +70,15 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   </tr>
                 ))}
               </Table>
+              <div className="mt-4">
+                <Delivery
+                  orderId={order.id}
+                  orderStatus={order.status}
+                  sellerOrder={seller}
+                  shipments={shipments.filter((shipment) => shipment.sellerOrderId === seller.id)}
+                  mayShip={mayShip}
+                />
+              </div>
             </section>
           ))}
           <Card className="p-6">

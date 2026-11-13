@@ -3147,6 +3147,18 @@
         "operationId": "adminListOrders",
         "parameters": [
           {
+            "name": "toSend",
+            "required": false,
+            "in": "query",
+            "description": "Only orders with items waiting to be sent",
+            "schema": {
+              "enum": [
+                "true"
+              ],
+              "type": "string"
+            }
+          },
+          {
             "name": "number",
             "required": false,
             "in": "query",
@@ -3255,6 +3267,227 @@
         "summary": "",
         "tags": [
           "admin orders"
+        ]
+      }
+    },
+    "/v1/admin/seller-orders/{id}/shipments": {
+      "post": {
+        "operationId": "adminSendSellerOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendShipmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShipmentResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hand a seller order's items to a courier",
+        "tags": [
+          "admin shipments"
+        ]
+      }
+    },
+    "/v1/admin/shipments/{id}/status": {
+      "post": {
+        "operationId": "adminUpdateShipmentStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShipmentStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShipmentResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record the next step of a delivery",
+        "tags": [
+          "admin shipments"
+        ]
+      }
+    },
+    "/v1/admin/shipments": {
+      "get": {
+        "operationId": "adminListShipments",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "created",
+                "allocated",
+                "picked_up",
+                "in_transit",
+                "out_for_delivery",
+                "delivered",
+                "delivery_failed",
+                "returning",
+                "returned",
+                "cancelled"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OpenShipmentResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Shipments on their way, longest waiting first",
+        "tags": [
+          "admin shipments"
+        ]
+      }
+    },
+    "/v1/admin/orders/{id}/shipments": {
+      "get": {
+        "operationId": "adminOrderShipments",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ShipmentResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin orders"
+        ]
+      }
+    },
+    "/v1/store/orders/{id}/shipments": {
+      "get": {
+        "operationId": "storeOrderShipments",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TrackingResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Where your order is",
+        "tags": [
+          "store orders"
         ]
       }
     }
@@ -5777,6 +6010,10 @@
           },
           "state": {
             "type": "string"
+          },
+          "toSend": {
+            "type": "boolean",
+            "description": "Paid, with items not yet handed to a courier"
           }
         },
         "required": [
@@ -5789,7 +6026,8 @@
           "lineCount",
           "firstItem",
           "city",
-          "state"
+          "state",
+          "toSend"
         ]
       },
       "OrderAddressDto": {
@@ -5936,6 +6174,10 @@
           "state": {
             "type": "string"
           },
+          "toSend": {
+            "type": "boolean",
+            "description": "Paid, with items not yet handed to a courier"
+          },
           "subtotal": {
             "$ref": "#/components/schemas/MoneyDto"
           },
@@ -5963,6 +6205,7 @@
           "firstItem",
           "city",
           "state",
+          "toSend",
           "subtotal",
           "delivery",
           "address",
@@ -5978,10 +6221,15 @@
               "type": "number"
             },
             "description": "Orders in each status"
+          },
+          "toSend": {
+            "type": "number",
+            "description": "Paid orders with items not yet handed to a courier"
           }
         },
         "required": [
-          "byStatus"
+          "byStatus",
+          "toSend"
         ]
       },
       "AdminOrderResponse": {
@@ -6027,6 +6275,10 @@
           "state": {
             "type": "string"
           },
+          "toSend": {
+            "type": "boolean",
+            "description": "Paid, with items not yet handed to a courier"
+          },
           "subtotal": {
             "$ref": "#/components/schemas/MoneyDto"
           },
@@ -6067,6 +6319,7 @@
           "firstItem",
           "city",
           "state",
+          "toSend",
           "subtotal",
           "delivery",
           "address",
@@ -6074,6 +6327,425 @@
           "paymentId",
           "checkoutId",
           "customerId"
+        ]
+      },
+      "SendShipmentDto": {
+        "type": "object",
+        "properties": {
+          "courier": {
+            "type": "string",
+            "example": "GIG Logistics",
+            "description": "Who is delivering: a rider, company or courier"
+          },
+          "trackingReference": {
+            "type": "string",
+            "description": "The courier's tracking number. Leave out and Vendra issues a reference."
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "courier"
+        ]
+      },
+      "ShipmentItemDto": {
+        "type": "object",
+        "properties": {
+          "orderLineId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "orderLineId",
+          "quantity"
+        ]
+      },
+      "StaffStatusChangeDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "created",
+              "allocated",
+              "picked_up",
+              "in_transit",
+              "out_for_delivery",
+              "delivered",
+              "delivery_failed",
+              "returning",
+              "returned",
+              "cancelled"
+            ]
+          },
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status",
+          "at"
+        ]
+      },
+      "DeliveryAttemptDto": {
+        "type": "object",
+        "properties": {
+          "attemptNumber": {
+            "type": "number"
+          },
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "successful": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "attemptNumber",
+          "at",
+          "successful"
+        ]
+      },
+      "ShipmentResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sellerOrderId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "created",
+              "allocated",
+              "picked_up",
+              "in_transit",
+              "out_for_delivery",
+              "delivered",
+              "delivery_failed",
+              "returning",
+              "returned",
+              "cancelled"
+            ]
+          },
+          "courier": {
+            "type": "string",
+            "nullable": true
+          },
+          "trackingReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShipmentItemDto"
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaffStatusChangeDto"
+            }
+          },
+          "provider": {
+            "type": "string"
+          },
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryAttemptDto"
+            }
+          },
+          "nextStatuses": {
+            "type": "array",
+            "description": "Where it can go next",
+            "items": {
+              "type": "string",
+              "enum": [
+                "created",
+                "allocated",
+                "picked_up",
+                "in_transit",
+                "out_for_delivery",
+                "delivered",
+                "delivery_failed",
+                "returning",
+                "returned",
+                "cancelled"
+              ]
+            }
+          },
+          "version": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "sellerOrderId",
+          "status",
+          "items",
+          "history",
+          "provider",
+          "attempts",
+          "nextStatuses",
+          "version"
+        ]
+      },
+      "ShipmentStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "created",
+              "allocated",
+              "picked_up",
+              "in_transit",
+              "out_for_delivery",
+              "delivered",
+              "delivery_failed",
+              "returning",
+              "returned",
+              "cancelled"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "description": "Required when a delivery fails: why"
+          },
+          "version": {
+            "type": "number",
+            "description": "The version you were looking at. A newer one means someone else changed it."
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "ShipmentOrderDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "orderNumber": {
+            "type": "string"
+          },
+          "recipient": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "itemCount": {
+            "type": "number",
+            "description": "Units in the shipment"
+          }
+        },
+        "required": [
+          "orderId",
+          "orderNumber",
+          "recipient",
+          "phone",
+          "city",
+          "state",
+          "itemCount"
+        ]
+      },
+      "OpenShipmentResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sellerOrderId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "created",
+              "allocated",
+              "picked_up",
+              "in_transit",
+              "out_for_delivery",
+              "delivered",
+              "delivery_failed",
+              "returning",
+              "returned",
+              "cancelled"
+            ]
+          },
+          "courier": {
+            "type": "string",
+            "nullable": true
+          },
+          "trackingReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShipmentItemDto"
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaffStatusChangeDto"
+            }
+          },
+          "provider": {
+            "type": "string"
+          },
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryAttemptDto"
+            }
+          },
+          "nextStatuses": {
+            "type": "array",
+            "description": "Where it can go next",
+            "items": {
+              "type": "string",
+              "enum": [
+                "created",
+                "allocated",
+                "picked_up",
+                "in_transit",
+                "out_for_delivery",
+                "delivered",
+                "delivery_failed",
+                "returning",
+                "returned",
+                "cancelled"
+              ]
+            }
+          },
+          "version": {
+            "type": "number"
+          },
+          "order": {
+            "$ref": "#/components/schemas/ShipmentOrderDto"
+          }
+        },
+        "required": [
+          "id",
+          "sellerOrderId",
+          "status",
+          "items",
+          "history",
+          "provider",
+          "attempts",
+          "nextStatuses",
+          "version",
+          "order"
+        ]
+      },
+      "StatusChangeDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "created",
+              "allocated",
+              "picked_up",
+              "in_transit",
+              "out_for_delivery",
+              "delivered",
+              "delivery_failed",
+              "returning",
+              "returned",
+              "cancelled"
+            ]
+          },
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "at"
+        ]
+      },
+      "TrackingResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sellerOrderId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "created",
+              "allocated",
+              "picked_up",
+              "in_transit",
+              "out_for_delivery",
+              "delivered",
+              "delivery_failed",
+              "returning",
+              "returned",
+              "cancelled"
+            ]
+          },
+          "courier": {
+            "type": "string",
+            "nullable": true
+          },
+          "trackingReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShipmentItemDto"
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatusChangeDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "sellerOrderId",
+          "status",
+          "items",
+          "history"
         ]
       }
     }

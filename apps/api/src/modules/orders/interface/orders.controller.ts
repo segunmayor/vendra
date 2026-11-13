@@ -11,6 +11,7 @@ const STATUSES = ['placed', 'stock_issue', 'cancelled', 'fulfilled'] as const;
 const listSchema = z.object({
   status: z.enum(STATUSES).optional(),
   number: z.string().trim().regex(/^\d{1,12}$/).optional(),
+  toSend: z.enum(['true']).transform(() => true).optional(),
 });
 
 class MoneyDto {
@@ -55,6 +56,7 @@ export class OrderSummaryResponse {
   @ApiProperty({ description: 'The first item, for a short description' }) firstItem!: string;
   @ApiProperty() city!: string;
   @ApiProperty() state!: string;
+  @ApiProperty({ description: 'Paid, with items not yet handed to a courier' }) toSend!: boolean;
 }
 
 export class OrderResponse extends OrderSummaryResponse {
@@ -73,6 +75,7 @@ export class AdminOrderResponse extends OrderResponse {
 
 export class OrderCountsResponse {
   @ApiProperty({ type: 'object', additionalProperties: { type: 'number' }, description: 'Orders in each status' }) byStatus!: Record<string, number>;
+  @ApiProperty({ description: 'Paid orders with items not yet handed to a courier' }) toSend!: number;
 }
 
 const money = (value: Money): MoneyDto => ({ amountMinor: value.minor.toString(), currency: value.currency });
@@ -91,6 +94,7 @@ function summary(order: Order): OrderSummaryResponse {
     firstItem: first?.productName ?? '',
     city: state.address.city,
     state: state.address.state,
+    toSend: state.status === 'placed' && state.sellerOrders.some((seller) => seller.status === 'pending'),
   };
 }
 
@@ -159,6 +163,7 @@ export class AdminOrdersController {
   @ApiOperation({ operationId: 'adminListOrders', summary: 'Latest 100 orders, optionally by status or order number' })
   @ApiQuery({ name: 'status', required: false, enum: STATUSES })
   @ApiQuery({ name: 'number', required: false, type: String })
+  @ApiQuery({ name: 'toSend', required: false, enum: ['true'], description: 'Only orders with items waiting to be sent' })
   @ApiOkResponse({ type: [OrderSummaryResponse] })
   async list(@Query(new ZodPipe(listSchema)) query: z.infer<typeof listSchema>): Promise<OrderSummaryResponse[]> {
     return (await this.orders.list(query)).map(summary);
@@ -168,7 +173,7 @@ export class AdminOrdersController {
   @ApiOperation({ operationId: 'adminOrderCounts' })
   @ApiOkResponse({ type: OrderCountsResponse })
   async counts(): Promise<OrderCountsResponse> {
-    return { byStatus: await this.orders.counts() };
+    return this.orders.counts();
   }
 
   @Get(':id')

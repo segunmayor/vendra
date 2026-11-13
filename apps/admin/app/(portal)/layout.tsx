@@ -11,6 +11,7 @@ import { signOut } from '../login/actions';
 const NAVIGATION: readonly (NavItem & { permission?: string })[] = [
   { label: 'Dashboard', href: '/' },
   { label: 'Orders', href: '/orders', permission: 'orders.manage' },
+  { label: 'Deliveries', href: '/shipments', permission: 'shipments.manage' },
   { label: 'Products', href: '/catalogue/products', permission: 'catalogue.manage' },
   { label: 'Categories', href: '/catalogue/categories', permission: 'catalogue.manage' },
   { label: 'Brands', href: '/catalogue/brands', permission: 'catalogue.manage' },

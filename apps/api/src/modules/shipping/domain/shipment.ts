@@ -50,6 +50,8 @@ export interface ShipmentState {
   readonly sellerOrderId: string;
   readonly mode: FulfilmentMode;
   readonly provider: string;
+  /** Who carries it: a rider's company or a courier, as staff entered it. */
+  readonly courier: string | null;
   readonly trackingReference: string | null;
   readonly status: ShipmentStatus;
   readonly items: readonly ShipmentItem[];
@@ -70,6 +72,7 @@ export class Shipment extends AggregateRoot {
     readonly sellerOrderId: string,
     readonly mode: FulfilmentMode,
     readonly provider: string,
+    readonly courier: string | null,
     readonly items: readonly ShipmentItem[],
     now: Date,
   ) {
@@ -83,6 +86,7 @@ export class Shipment extends AggregateRoot {
       state.sellerOrderId,
       state.mode,
       state.provider,
+      state.courier,
       state.items,
       new Date(0),
     );
@@ -119,6 +123,7 @@ export class Shipment extends AggregateRoot {
     sellerOrderId: string;
     mode: FulfilmentMode;
     provider: string;
+    courier?: string | null;
     items: readonly ShipmentItem[];
     now: Date;
   }): Shipment {
@@ -128,7 +133,13 @@ export class Shipment extends AggregateRoot {
     if (input.items.some((item) => !Number.isInteger(item.quantity) || item.quantity <= 0)) {
       throw new DomainError('shipment.invalid_quantity', 'Item quantities must be positive integers');
     }
-    return new Shipment(input.id, input.sellerOrderId, input.mode, input.provider, [...input.items], input.now);
+    const courier = input.courier?.trim() || null;
+    return new Shipment(input.id, input.sellerOrderId, input.mode, input.provider, courier, [...input.items], input.now);
+  }
+
+  /** Where it can go next, for the staff screen. */
+  get nextStatuses(): readonly ShipmentStatus[] {
+    return TRANSITIONS[this.status];
   }
 
   get currentStatus(): ShipmentStatus {

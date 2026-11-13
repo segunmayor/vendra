@@ -13,22 +13,26 @@ function Tile({ href, count, label, note, urgent }: { href: string; count: numbe
 }
 
 export default async function DashboardPage() {
-  const [catalogue, orders, payments] = await Promise.all([can('catalogue.manage'), can('orders.manage'), can('payments.read')]);
-  const [counts, review] = await Promise.all([
+  const [catalogue, orders, payments, shipping] = await Promise.all([can('catalogue.manage'), can('orders.manage'), can('payments.read'), can('shipments.manage')]);
+  const [counts, review, failed] = await Promise.all([
     orders ? session.read((api) => api.GET('/v1/admin/orders/counts')) : null,
     payments ? session.read((api) => api.GET('/v1/admin/payments', { params: { query: { status: 'requires_review' } } })) : null,
+    shipping ? session.read((api) => api.GET('/v1/admin/shipments', { params: { query: { status: 'delivery_failed' } } })) : null,
   ]);
 
   return (
     <>
       <PageHeader title="Dashboard" />
-      {counts || review ? (
+      {counts || review || failed ? (
         <section aria-labelledby="attention" className="mb-8">
           <h2 id="attention" className="mb-3 text-lg font-semibold">
             Needs attention
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {counts ? <Tile href="/orders?status=placed" count={counts.byStatus.placed ?? 0} label="Orders to send" note="Paid and waiting to be packed." /> : null}
+            {counts ? <Tile href="/orders?toSend=true" count={counts.toSend} label="Orders to send" note="Paid and waiting to be handed to a courier." /> : null}
+            {failed ? (
+              <Tile href="/shipments?status=delivery_failed" count={failed.length} label="Failed deliveries" note="Call the customer, then try again or bring the parcel back." urgent />
+            ) : null}
             {counts ? (
               <Tile href="/orders?status=stock_issue" count={counts.byStatus.stock_issue ?? 0} label="Orders with a stock issue" note="Paid, but an item sold out. Refund and call the customer." urgent />
             ) : null}

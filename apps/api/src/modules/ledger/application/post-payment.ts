@@ -57,3 +57,33 @@ export class PostRefundPaid {
     return this.journal.append(entry);
   }
 }
+
+/**
+ * Records a delivered order: Vendra no longer owes the customer their prepayment (debit), and
+ * has earned the item prices and the delivery charge (credits). Posting twice for one order is a
+ * no-op.
+ */
+export class PostOrderDelivered {
+  constructor(
+    private readonly journal: JournalRepository,
+    private readonly settings: SettingsReader,
+    private readonly ids: { uuid(): string },
+  ) {}
+
+  async execute(orderId: string, amounts: { subtotal: Money; delivery: Money }, postedAt: Date): Promise<'posted' | 'duplicate'> {
+    const [prepayments, sales, deliveryIncome] = await this.settings.getMany(['payments.ledgerPrepaymentAccount', 'payments.ledgerSalesAccount', 'payments.ledgerDeliveryIncomeAccount'] as const);
+    const total = amounts.subtotal.add(amounts.delivery);
+    const credits = [
+      { accountCode: sales, side: 'credit' as const, amount: amounts.subtotal },
+      { accountCode: deliveryIncome, side: 'credit' as const, amount: amounts.delivery },
+    ].filter((line) => line.amount.isPositive());
+    const entry = JournalEntry.post({
+      id: this.ids.uuid(),
+      sourceType: 'order_delivered',
+      sourceId: orderId,
+      postedAt,
+      lines: [{ accountCode: prepayments, side: 'debit', amount: total }, ...credits],
+    });
+    return this.journal.append(entry);
+  }
+}

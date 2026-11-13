@@ -293,9 +293,13 @@ describe('PrismaShipmentRepository', () => {
     expect(loaded.deliveryAttempts.map((a) => [a.attemptNumber, a.successful])).toEqual([[1, false], [2, true]]);
   });
 
-  it('stores several shipments for one seller order', async () => {
+  it('stores several shipments for one seller order, one on its way at a time', async () => {
     const sellerOrderId = randomUUID();
-    await repo.save(newShipment(sellerOrderId));
+    const first = newShipment(sellerOrderId);
+    await repo.save(first);
+    await expect(repo.save(newShipment(sellerOrderId))).rejects.toThrow('already have a shipment');
+    first.transitionTo('cancelled', now);
+    await repo.save(first);
     await repo.save(newShipment(sellerOrderId));
     await expect(prisma.shipment.count({ where: { sellerOrderId } })).resolves.toBe(2);
   });

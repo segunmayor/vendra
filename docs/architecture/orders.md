@@ -32,9 +32,20 @@ Safeguards:
 |---|---|
 | `placed` | Paid, waiting to be sent |
 | `stock_issue` | Paid, but an item sold out. Refund the customer from the payment page |
-| `cancelled`, `fulfilled` | Reserved for staff cancellation and delivery (later steps) |
+| `fulfilled` | Every seller order delivered. The sale is recognised in the ledger |
+| `cancelled` | Reserved for staff cancellation (a later step) |
 
-Each `SellerOrder` starts `pending`. `dispatched` and `delivered` come with Step 8 (dispatch and tracking).
+Each `SellerOrder` starts `pending` and follows its shipments (see [dispatch-and-tracking.md](dispatch-and-tracking.md)):
+
+| Seller order | Set when a shipment is |
+|---|---|
+| `pending` | not yet collected, or cancelled or returned (the items are back with Vendra) |
+| `dispatched` | collected, on the way, out for delivery, failed an attempt, or coming back |
+| `delivered` | delivered. Final |
+
+Orders apply these from `ShipmentStatusChanged` and only ever move forward, so a repeated or late event changes nothing. The only step back is to `pending` after a cancellation or return. When every seller order that is not cancelled is delivered, the order becomes `fulfilled` and records `OrderFulfilled`, once.
+
+"To send" (admin list filter, dashboard tile, `toSend` on each order) means `placed` with at least one seller order still `pending`.
 
 ## Not built yet
 

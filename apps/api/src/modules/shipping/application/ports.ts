@@ -1,4 +1,4 @@
-import { Money } from '../../../shared-kernel';
+import { AuditEntry, Money } from '../../../shared-kernel';
 import { Shipment, ShipmentStatus } from '../domain/shipment';
 
 export interface QuoteRequest {
@@ -26,6 +26,14 @@ export interface LogisticsProviderPort {
 
 export interface ShipmentRepository {
   findById(id: string): Promise<Shipment | null>;
-  /** Commits state and pulled events atomically. */
-  save(shipment: Shipment): Promise<void>;
+  /** Oldest first. */
+  listForSellerOrders(sellerOrderIds: readonly string[]): Promise<Shipment[]>;
+  /** Least recently changed first, so what has waited longest comes first. */
+  listByStatus(statuses: readonly ShipmentStatus[], limit: number): Promise<Shipment[]>;
+  /**
+   * Commits state, pulled events and the audit entry atomically. Throws ConcurrencyConflict on
+   * a stale version, and a conflict ApplicationError when the seller order already has an
+   * open shipment or the courier's tracking number is taken.
+   */
+  save(shipment: Shipment, audit?: AuditEntry): Promise<void>;
 }

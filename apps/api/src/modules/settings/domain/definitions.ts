@@ -54,7 +54,9 @@ export const SETTINGS = {
   'payments.storefrontUrl': { group: 'payments', kind: 'url', default: 'http://localhost:3000', label: 'Customer site address', description: 'Customers return here after paying, for example https://vendra.ng.' },
   'payments.apiUrl': { group: 'payments', kind: 'url', default: 'http://localhost:4000', label: 'API address', description: 'Used to build the webhook address you enter in each gateway dashboard.' },
   'payments.ledgerClearingAccount': { group: 'payments', kind: 'text', maxLength: 20, default: '1100', label: 'Ledger account for money held by gateways', description: 'Debited when a payment succeeds, credited when a refund is confirmed.' },
-  'payments.ledgerPrepaymentAccount': { group: 'payments', kind: 'text', maxLength: 20, default: '2100', label: 'Ledger account for customer prepayments', description: 'Credited when a payment succeeds, until the order is delivered. Debited when a refund is confirmed.' },
+  'payments.ledgerPrepaymentAccount': { group: 'payments', kind: 'text', maxLength: 20, default: '2100', label: 'Ledger account for customer prepayments', description: 'Credited when a payment succeeds, until the order is delivered. Debited when the order is delivered or a refund is confirmed.' },
+  'payments.ledgerSalesAccount': { group: 'payments', kind: 'text', maxLength: 20, default: '4000', label: 'Ledger account for sales', description: 'Credited with the price of the items when an order is delivered.' },
+  'payments.ledgerDeliveryIncomeAccount': { group: 'payments', kind: 'text', maxLength: 20, default: '4100', label: 'Ledger account for delivery charges', description: 'Credited with the delivery charge when an order is delivered.' },
 } as const satisfies Record<string, SettingDefinition>;
 
 export type SettingKey = keyof typeof SETTINGS;

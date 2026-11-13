@@ -60,3 +60,53 @@ describe('Order', () => {
     expect(() => Order.place(input({ lines: [] }))).toThrow('at least one');
   });
 });
+
+describe('Order delivery', () => {
+  const placed = () => {
+    const order = Order.place(input({ lines: [line('s1', 'A', 1, 1_000n), line('s2', 'B', 2, 1_000n)] }));
+    order.pullEvents();
+    return order;
+  };
+  const sellers = (order: Order) => order.snapshot.sellerOrders.map((seller) => seller.status);
+
+  it('is fulfilled once every seller order is delivered, and says so once', () => {
+    const order = placed();
+    const [a, b] = order.snapshot.sellerOrders.map((seller) => seller.id) as [string, string];
+    expect(order.applyShipmentStatus(a, 'dispatched', now)).toBe(true);
+    expect(order.applyShipmentStatus(a, 'delivered', now)).toBe(true);
+    expect(order.snapshot.status).toBe('placed');
+    expect(order.pullEvents()).toEqual([]);
+    order.applyShipmentStatus(b, 'delivered', now);
+    expect(order.snapshot.status).toBe('fulfilled');
+    expect(order.pullEvents()).toEqual([expect.objectContaining({ type: 'OrderFulfilled', payload: expect.objectContaining({ paymentId: 'p1', totalMinor: '3500' }) })]);
+    expect(order.applyShipmentStatus(b, 'delivered', now)).toBe(false);
+    expect(order.pullEvents()).toEqual([]);
+  });
+
+  it('ignores late or repeated updates that would move it backwards', () => {
+    const order = placed();
+    const a = order.snapshot.sellerOrders[0]!.id;
+    order.applyShipmentStatus(a, 'delivered', now);
+    expect(order.applyShipmentStatus(a, 'dispatched', now)).toBe(false);
+    expect(order.applyShipmentStatus(a, 'back_to_pending', now)).toBe(false);
+    expect(sellers(order)).toEqual(['delivered', 'pending']);
+  });
+
+  it('goes back to waiting when a shipment is cancelled or returned', () => {
+    const order = placed();
+    const a = order.snapshot.sellerOrders[0]!.id;
+    order.applyShipmentStatus(a, 'dispatched', now);
+    order.applyShipmentStatus(a, 'back_to_pending', now);
+    expect(sellers(order)).toEqual(['pending', 'pending']);
+  });
+
+  it('can only be sent when paid with stock secured, and not twice', () => {
+    const order = placed();
+    const a = order.snapshot.sellerOrders[0]!.id;
+    expect(() => order.assertShippable(a)).not.toThrow();
+    order.applyShipmentStatus(a, 'dispatched', now);
+    expect(() => order.assertShippable(a)).toThrow('already dispatched');
+    const flagged = Order.place(input({ stockIssue: true }));
+    expect(() => flagged.assertShippable(flagged.snapshot.sellerOrders[0]!.id)).toThrow('stock issue');
+  });
+});

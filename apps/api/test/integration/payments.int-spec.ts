@@ -595,6 +595,139 @@ describe('orders', () => {
   });
 });
 
+describe('dispatch and delivery', () => {
+  let dispatcher: string;
+  let clerk: string;
+
+  beforeAll(async () => {
+    dispatcher = await staffToken(['orders.manage', 'shipments.manage']);
+    clerk = await staffToken(['orders.manage']);
+  });
+
+  /** A placed order of 2 × 12,500 plus 2,500 delivery. */
+  async function placed() {
+    const shopper = await openCheckout(2);
+    const { reference } = ok(await call('POST', `store/checkout/${shopper.checkout.id}/payments`, { token: shopper.token, body: { gatewayId: paystackId } }), 201);
+    fake.transactions.set(reference, { status: 'success', amount: 2750000, currency: 'NGN', id: txId() });
+    ok(await call('POST', `store/payments/${reference}/verify`, { token: shopper.token }));
+    const order = ok(await call('GET', `store/orders/by-checkout/${shopper.checkout.id}`, { token: shopper.token }));
+    return { ...shopper, order, sellerOrderId: order.sellerOrders[0].id as string };
+  }
+  const send = (sellerOrderId: string, body: Record<string, unknown> = { courier: 'GIG Logistics', trackingReference: `GIG-${unique()}` }, token = dispatcher) =>
+    call('POST', `admin/seller-orders/${sellerOrderId}/shipments`, { token, body });
+  const step = (shipmentId: string, status: string, extra: Record<string, unknown> = {}) => call('POST', `admin/shipments/${shipmentId}/status`, { token: dispatcher, body: { status, ...extra } });
+  const staffOrder = async (id: string) => ok(await call('GET', `admin/orders/${id}`, { token: clerk }));
+
+  it('follows a parcel from courier to door, completes the order and recognises the sale in the ledger', async () => {
+    const { token, order, sellerOrderId } = await placed();
+    const waybill = `GIG ${unique()}/A`;
+    const shipment = ok(await send(sellerOrderId, { courier: 'GIG Logistics', trackingReference: waybill }), 201);
+    expect(shipment).toMatchObject({ status: 'allocated', courier: 'GIG Logistics', trackingReference: waybill, provider: 'manual_dispatch', items: [{ quantity: 2 }], nextStatuses: ['picked_up', 'cancelled'] });
+    expect((await staffOrder(order.id)).sellerOrders[0].status).toBe('pending');
+
+    const toSend = async () => ok(await call('GET', 'admin/orders?toSend=true', { token: clerk })).some((entry: { id: string }) => entry.id === order.id);
+    expect(await toSend()).toBe(true);
+    expect(ok(await call('GET', 'admin/orders/counts', { token: clerk })).toSend).toBeGreaterThanOrEqual(1);
+    ok(await step(shipment.id, 'picked_up', { note: 'Musa collected at 9am' }));
+    expect(await staffOrder(order.id)).toMatchObject({ toSend: false, sellerOrders: [{ status: 'dispatched' }] });
+    expect(await toSend()).toBe(false);
+    ok(await step(shipment.id, 'in_transit'));
+    ok(await step(shipment.id, 'out_for_delivery'));
+    ok(await step(shipment.id, 'delivery_failed', { note: 'Customer not at home' }));
+    ok(await step(shipment.id, 'out_for_delivery'));
+    expect(await prisma.journalEntry.count({ where: { sourceType: 'order_delivered', sourceId: order.id } })).toBe(0);
+    const done = ok(await step(shipment.id, 'delivered'));
+    expect(done.attempts.map((attempt: { successful: boolean }) => attempt.successful)).toEqual([false, true]);
+
+    // The customer sees it delivered, with each step but none of the staff notes.
+    expect(ok(await call('GET', `store/orders/${order.id}`, { token }))).toMatchObject({ status: 'fulfilled', sellerOrders: [{ status: 'delivered' }] });
+    const [tracking] = ok(await call('GET', `store/orders/${order.id}/shipments`, { token }));
+    expect(tracking).toMatchObject({ status: 'delivered', courier: 'GIG Logistics', trackingReference: waybill });
+    expect(tracking.history.map((change: { status: string }) => change.status)).toEqual(['created', 'allocated', 'picked_up', 'in_transit', 'out_for_delivery', 'delivery_failed', 'out_for_delivery', 'delivered']);
+    expect(JSON.stringify(tracking)).not.toMatch(/Musa|not at home/);
+    expect(tracking.attempts).toBeUndefined();
+
+    const entry = await prisma.journalEntry.findUniqueOrThrow({ where: { sourceType_sourceId: { sourceType: 'order_delivered', sourceId: order.id } }, include: { lines: true } });
+    expect(entry.lines.map((line) => [line.accountCode, line.side, line.amountMinor]).sort()).toEqual([
+      ['2100', 'debit', 2750000n],
+      ['4000', 'credit', 2500000n],
+      ['4100', 'credit', 250000n],
+    ]);
+    expect(await prisma.auditLog.count({ where: { targetType: 'shipment', targetId: shipment.id } })).toBe(7);
+    expect(ok(await call('GET', `admin/orders/${order.id}/shipments`, { token: clerk }))[0].history[2]).toMatchObject({ status: 'picked_up', note: 'Musa collected at 9am' });
+  });
+
+  it('posts the sale once and keeps the order delivered however often the events are delivered', async () => {
+    const { order, sellerOrderId } = await placed();
+    const { id } = ok(await send(sellerOrderId), 201);
+    for (const status of ['picked_up', 'in_transit', 'out_for_delivery', 'delivered']) ok(await step(id, status));
+    ok(await step(id, 'delivered'));
+    await prisma.outboxEvent.updateMany({ where: { aggregateId: { in: [id, order.id] } }, data: { publishedAt: null, attempts: 0 } });
+    await app.get(OutboxRunner).drain();
+    expect(await prisma.journalEntry.count({ where: { sourceType: 'order_delivered', sourceId: order.id } })).toBe(1);
+    expect(await prisma.outboxEvent.count({ where: { type: 'OrderFulfilled', aggregateId: order.id } })).toBe(1);
+    expect((await staffOrder(order.id)).status).toBe('fulfilled');
+  });
+
+  it('sends items once, even when two people press send together, and again only after a cancellation', async () => {
+    const { order, sellerOrderId } = await placed();
+    const replies = await Promise.all([send(sellerOrderId), send(sellerOrderId)]);
+    expect(replies.map((reply) => reply.status).sort()).toEqual([201, 409]);
+    const taken = replies.find((reply) => reply.status === 201)!.body.trackingReference;
+    const other = await placed();
+    expect((await send(other.sellerOrderId, { courier: 'GIG Logistics', trackingReference: taken })).body).toMatchObject({ status: 409, code: 'shipment.tracking_taken' });
+    const first = replies.find((reply) => reply.status === 201)!.body;
+    expect((await send(sellerOrderId)).body).toMatchObject({ status: 409, code: 'shipment.already_open' });
+    ok(await step(first.id, 'cancelled', { version: first.version }));
+    ok(await send(sellerOrderId, { courier: 'Our rider' }), 201);
+    expect(ok(await call('GET', `admin/orders/${order.id}/shipments`, { token: clerk })).map((entry: { status: string }) => entry.status)).toEqual(['cancelled', 'allocated']);
+  });
+
+  it('puts returned items back in the queue to send again', async () => {
+    const { order, sellerOrderId } = await placed();
+    const { id } = ok(await send(sellerOrderId), 201);
+    for (const status of ['picked_up', 'in_transit', 'out_for_delivery']) ok(await step(id, status));
+    ok(await step(id, 'delivery_failed', { note: 'Refused at the door' }));
+    ok(await step(id, 'returning'));
+    expect((await staffOrder(order.id)).sellerOrders[0].status).toBe('dispatched');
+    ok(await step(id, 'returned'));
+    expect(await staffOrder(order.id)).toMatchObject({ status: 'placed', sellerOrders: [{ status: 'pending' }] });
+    expect((await send(sellerOrderId)).status).toBe(201);
+  });
+
+  it('refuses skipped steps, a failure with no reason, stale changes, and sending delivered items', async () => {
+    const { sellerOrderId } = await placed();
+    const shipment = ok(await send(sellerOrderId), 201);
+    expect((await step(shipment.id, 'delivered')).body).toMatchObject({ status: 422, code: 'shipment.not_out_for_delivery' });
+    expect((await step(shipment.id, 'in_transit')).body).toMatchObject({ status: 422, code: 'shipment.invalid_transition' });
+    ok(await step(shipment.id, 'picked_up', { version: shipment.version }));
+    expect((await step(shipment.id, 'cancelled', { version: shipment.version })).body).toMatchObject({ status: 409, code: 'shipment.changed' });
+    for (const status of ['in_transit', 'out_for_delivery']) ok(await step(shipment.id, status));
+    expect((await step(shipment.id, 'delivery_failed')).status).toBe(400);
+    ok(await step(shipment.id, 'delivered'));
+    expect((await send(sellerOrderId)).body).toMatchObject({ status: 422, code: 'order.not_shippable' });
+  });
+
+  it('lists shipments on their way, with the order they belong to', async () => {
+    const { order, sellerOrderId } = await placed();
+    const { id } = ok(await send(sellerOrderId), 201);
+    const open = ok(await call('GET', 'admin/shipments', { token: dispatcher }));
+    expect(open.find((entry: { id: string }) => entry.id === id)).toMatchObject({ order: { orderId: order.id, orderNumber: order.number, city: 'Ikeja', itemCount: 2 } });
+    expect(ok(await call('GET', 'admin/shipments?status=picked_up', { token: dispatcher })).some((entry: { id: string }) => entry.id === id)).toBe(false);
+  });
+
+  it('needs shipments.manage to send or update, and shows customers only their own parcels', async () => {
+    const { order, sellerOrderId } = await placed();
+    expect((await send(sellerOrderId, { courier: 'GIG' }, clerk)).status).toBe(403);
+    expect((await call('GET', 'admin/shipments', { token: clerk })).status).toBe(403);
+    const { id } = ok(await send(sellerOrderId), 201);
+    expect((await call('POST', `admin/shipments/${id}/status`, { token: clerk, body: { status: 'picked_up' } })).status).toBe(403);
+    const stranger = await customer();
+    expect((await call('GET', `store/orders/${order.id}/shipments`, { token: stranger.token })).status).toBe(404);
+    expect((await send(randomUUID())).status).toBe(404);
+  });
+});
+
 describe('event delivery', () => {
   it('leaves nothing pending after a payment', async () => {
     await app.get(OutboxRunner).drain();

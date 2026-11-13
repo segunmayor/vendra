@@ -1,7 +1,10 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { appendToOutbox } from '../../../platform/outbox/outbox';
-import { Money } from '../../../shared-kernel';
-import { OrderRepository } from '../application/orders.service';
+import { ConcurrencyConflict, Money } from '../../../shared-kernel';
+import { OrderFilter, OrderRepository } from '../application/orders.service';
+
+/** Paid, with items still waiting to be handed to a courier. */
+const TO_SEND = { status: 'placed', sellerOrders: { some: { status: 'pending' } } } satisfies Prisma.OrderWhereInput;
 import { Order, OrderAddress, OrderStatus, SellerOrderStatus } from '../domain/order';
 
 const include = { sellerOrders: { include: { lines: { orderBy: { position: 'asc' } } }, orderBy: { position: 'asc' } } } as const;
@@ -108,6 +111,31 @@ export class PrismaOrderRepository implements OrderRepository {
     return row ? toOrder(row) : null;
   }
 
+  async findBySellerOrder(sellerOrderId: string): Promise<Order | null> {
+    const row = await this.prisma.order.findFirst({ where: { sellerOrders: { some: { id: sellerOrderId } } }, include });
+    return row ? toOrder(row) : null;
+  }
+
+  async findBySellerOrders(sellerOrderIds: readonly string[]): Promise<Order[]> {
+    if (sellerOrderIds.length === 0) return [];
+    const rows = await this.prisma.order.findMany({ where: { sellerOrders: { some: { id: { in: [...sellerOrderIds] } } } }, include });
+    return rows.map(toOrder);
+  }
+
+  async save(order: Order): Promise<void> {
+    const state = order.snapshot;
+    const events = order.pullEvents();
+    await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.order.updateMany({ where: { id: state.id, version: state.version }, data: { status: state.status, version: { increment: 1 } } });
+      if (count !== 1) throw new ConcurrencyConflict('Order', state.id);
+      for (const seller of state.sellerOrders) {
+        await tx.sellerOrder.update({ where: { id: seller.id }, data: { status: seller.status } });
+      }
+      await appendToOutbox(tx, events);
+    });
+    order.markSaved();
+  }
+
   async findByCheckout(checkoutId: string): Promise<Order | null> {
     const row = await this.prisma.order.findUnique({ where: { checkoutId }, include });
     return row ? toOrder(row) : null;
@@ -118,9 +146,13 @@ export class PrismaOrderRepository implements OrderRepository {
     return rows.map(toOrder);
   }
 
-  async listRecent(limit: number, filter: { status?: OrderStatus; number?: string }): Promise<Order[]> {
+  async listRecent(limit: number, filter: OrderFilter): Promise<Order[]> {
     const rows = await this.prisma.order.findMany({
-      where: { ...(filter.status ? { status: filter.status } : {}), ...(filter.number ? { number: filter.number } : {}) },
+      where: {
+        ...(filter.status ? { status: filter.status } : {}),
+        ...(filter.number ? { number: filter.number } : {}),
+        ...(filter.toSend ? TO_SEND : {}),
+      },
       include,
       orderBy: { placedAt: 'desc' },
       take: limit,
@@ -131,5 +163,9 @@ export class PrismaOrderRepository implements OrderRepository {
   async countByStatus(): Promise<Record<string, number>> {
     const rows = await this.prisma.order.groupBy({ by: ['status'], _count: { _all: true } });
     return Object.fromEntries(rows.map((row) => [row.status, row._count._all]));
+  }
+
+  countToSend(): Promise<number> {
+    return this.prisma.order.count({ where: TO_SEND });
   }
 }

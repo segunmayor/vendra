@@ -732,13 +732,16 @@ model Shipment {
   mode              FulfilmentMode
   status            ShipmentStatus        @default(created)
   provider          String
-  trackingReference String?               @unique
+  courier           String?
+  trackingReference String?
   version           Int                   @default(0)
   createdAt         DateTime              @default(now()) @db.Timestamptz
+  updatedAt         DateTime              @default(now()) @updatedAt @db.Timestamptz
   items             ShipmentItem[]
   history           ShipmentStatusEvent[]
   attempts          DeliveryAttempt[]
 
+  @@unique([courier, trackingReference])
   @@index([sellerOrderId])
   @@index([status])
   @@map("shipments")

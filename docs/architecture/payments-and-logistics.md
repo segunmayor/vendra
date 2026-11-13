@@ -28,7 +28,7 @@ Reconciliation is a scheduled worker job that compares provider transactions wit
 
 ### Ledger
 
-Double-entry. `JournalEntry` refuses to exist unless debits equal credits in a single currency. Marketplace commission and vendor payables use the same ledger when `settlements` is built.
+Double-entry. `JournalEntry` refuses to exist unless debits equal credits in a single currency. Postings so far: payment received, refund paid, and order delivered (prepayment to sales and delivery charges). Marketplace commission and vendor payables use the same ledger when `settlements` is built.
 
 ## Logistics
 
@@ -49,4 +49,4 @@ created → allocated → picked_up → in_transit → out_for_delivery → deli
 - Each status change appends to the shipment's history. A repeated carrier update for the current status is ignored.
 - Each delivery attempt is recorded individually.
 - Delivery prices come from `logistics` zone and rate tables at launch. A carrier adapter may return a live quote instead.
-- The launch adapter is manual dispatch: staff allocate riders and update status from the admin portal.
+- The launch adapter is manual dispatch: staff allocate riders and update status from the admin portal. See [dispatch-and-tracking.md](dispatch-and-tracking.md).
