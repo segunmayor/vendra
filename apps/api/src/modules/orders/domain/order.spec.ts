@@ -110,3 +110,59 @@ describe('Order delivery', () => {
     expect(() => flagged.assertShippable(flagged.snapshot.sellerOrders[0]!.id)).toThrow('stock issue');
   });
 });
+
+describe('Order cancellation', () => {
+  const twoSellers = () => {
+    const order = Order.place(input({ lines: [line('s1', 'A', 1, 1_500n), line('s2', 'B', 1, 1_500n)] }));
+    order.pullEvents();
+    return order;
+  };
+
+  it('cancels every seller order, records who and why, and says whether stock was taken', () => {
+    const order = twoSellers();
+    expect(order.cannotCancelBecause).toBeNull();
+    order.cancel('  Customer asked by phone  ', 'staff1', now);
+    expect(order.snapshot.status).toBe('cancelled');
+    expect(order.snapshot.sellerOrders.map((seller) => seller.status)).toEqual(['cancelled', 'cancelled']);
+    expect(order.snapshot.cancellation).toEqual({ reason: 'Customer asked by phone', by: 'staff1', at: now });
+    const [event] = order.pullEvents();
+    expect(event).toMatchObject({
+      type: 'OrderCancelled',
+      payload: { orderId: 'o1', checkoutId: 'c1', paymentId: 'p1', stockTaken: true, sellerOrderIds: order.snapshot.sellerOrders.map((seller) => seller.id) },
+    });
+  });
+
+  it('can close a stock issue order, which never took stock', () => {
+    const order = Order.place(input({ stockIssue: true }));
+    order.pullEvents();
+    order.cancel('Sold out, refunded', 'staff1', now);
+    expect(order.pullEvents()[0]!.payload.stockTaken).toBe(false);
+  });
+
+  it('needs a reason', () => {
+    expect(() => twoSellers().cancel('  ', 'staff1', now)).toThrow('Say why');
+    expect(() => twoSellers().cancel('x'.repeat(301), 'staff1', now)).toThrow('under 300');
+  });
+
+  it('refuses once any items are with a courier, delivered, or already cancelled', () => {
+    const collected = twoSellers();
+    collected.applyShipmentStatus(collected.snapshot.sellerOrders[1]!.id, 'dispatched', now);
+    expect(collected.cannotCancelBecause).toMatch(/collected by a courier/);
+    expect(() => collected.cancel('Changed mind', 'staff1', now)).toThrow('cannot be cancelled');
+
+    const delivered = Order.place(input());
+    delivered.applyShipmentStatus(delivered.snapshot.sellerOrders[0]!.id, 'delivered', now);
+    expect(() => delivered.cancel('Changed mind', 'staff1', now)).toThrow('delivered');
+
+    const cancelled = twoSellers();
+    cancelled.cancel('Changed mind', 'staff1', now);
+    expect(() => cancelled.cancel('Again', 'staff1', now)).toThrow('already cancelled');
+  });
+
+  it('ignores shipment updates that arrive after cancellation', () => {
+    const order = twoSellers();
+    order.cancel('Changed mind', 'staff1', now);
+    expect(order.applyShipmentStatus(order.snapshot.sellerOrders[0]!.id, 'back_to_pending', now)).toBe(false);
+    expect(order.snapshot.status).toBe('cancelled');
+  });
+});

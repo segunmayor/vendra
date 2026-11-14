@@ -756,6 +756,115 @@ describe('dispatch and delivery', () => {
   });
 });
 
+describe('cancellation', () => {
+  let clerk: string;
+  let dispatcher: string;
+
+  beforeAll(async () => {
+    clerk = await staffToken(['orders.manage']);
+    dispatcher = await staffToken(['orders.manage', 'shipments.manage']);
+  });
+
+  /** 2 of 5 units bought: 2 × 12,500 plus 2,500 delivery. */
+  async function placed() {
+    const shopper = await openCheckout(2, 5);
+    const { reference } = ok(await call('POST', `store/checkout/${shopper.checkout.id}/payments`, { token: shopper.token, body: { gatewayId: paystackId } }), 201);
+    fake.transactions.set(reference, { status: 'success', amount: 2750000, currency: 'NGN', id: txId() });
+    ok(await call('POST', `store/payments/${reference}/verify`, { token: shopper.token }));
+    const order = ok(await call('GET', `store/orders/by-checkout/${shopper.checkout.id}`, { token: shopper.token }));
+    return { ...shopper, order, sellerOrderId: order.sellerOrders[0].id as string };
+  }
+  const cancel = (id: string, body: Record<string, unknown> = { reason: 'Customer asked by phone' }, token = clerk) => call('POST', `admin/orders/${id}/cancel`, { token, body });
+  const send = (sellerOrderId: string) => call('POST', `admin/seller-orders/${sellerOrderId}/shipments`, { token: dispatcher, body: { courier: 'GIG Logistics' } });
+
+  it('cancels before collection: stock back on sale, the waiting shipment cancelled, then a refund from prepayments', async () => {
+    const { token, order, listingId, sellerOrderId } = await placed();
+    expect(await stockOf(listingId)).toEqual({ onHand: 3, reserved: 0 });
+    const shipment = ok(await send(sellerOrderId), 201);
+    const before = ok(await call('GET', `admin/orders/${order.id}`, { token: clerk }));
+    expect(before).toMatchObject({ cannotCancelBecause: null, cancellation: null });
+
+    const after = ok(await cancel(order.id, { reason: '  Customer asked by phone  ', version: before.version }));
+    expect(after).toMatchObject({
+      status: 'cancelled',
+      toSend: false,
+      sellerOrders: [{ status: 'cancelled' }],
+      cancellation: { reason: 'Customer asked by phone', at: expect.any(String) },
+      cannotCancelBecause: 'It is already cancelled',
+    });
+    // Reactions have run by the time staff see the answer.
+    expect(await stockOf(listingId)).toEqual({ onHand: 5, reserved: 0 });
+    const [waiting] = ok(await call('GET', `admin/orders/${order.id}/shipments`, { token: clerk }));
+    expect(waiting).toMatchObject({ id: shipment.id, status: 'cancelled', nextStatuses: [] });
+    const collect = await call('POST', `admin/shipments/${shipment.id}/status`, { token: dispatcher, body: { status: 'picked_up' } });
+    expect({ status: collect.status, code: collect.body.code }).toEqual({ status: 409, code: 'shipment.order_cancelled' });
+    expect((await send(sellerOrderId)).status).toBe(422);
+
+    const mine = ok(await call('GET', `store/orders/${order.id}`, { token }));
+    expect(mine).toMatchObject({ status: 'cancelled', cancelledAt: expect.any(String) });
+    expect(mine.cancellation).toBeUndefined();
+    expect(JSON.stringify(mine)).not.toContain('asked by phone');
+
+    const movement = await prisma.stockMovement.findMany({ where: { sourceType: 'order', sourceId: order.id } });
+    expect(movement.map((row) => [row.reason, row.delta])).toEqual([['order_cancelled', 2]]);
+    expect(await prisma.auditLog.count({ where: { action: 'orders.cancelled', targetId: order.id } })).toBe(1);
+
+    // Repeated events give nothing back twice.
+    await prisma.outboxEvent.updateMany({ where: { type: 'OrderCancelled', aggregateId: order.id }, data: { publishedAt: null, attempts: 0 } });
+    await app.get(OutboxRunner).drain();
+    expect(await stockOf(listingId)).toEqual({ onHand: 5, reserved: 0 });
+    expect((await cancel(order.id)).status).toBe(422);
+
+    // The refund comes out of prepayments, since no sale was recognised.
+    const refunder = await staffToken(['payments.read', 'orders.refund']);
+    const { paymentId } = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    const sent = ok(await call('POST', `admin/payments/${paymentId}/refunds`, { token: refunder, body: { amountMinor: '2750000', reason: 'Order cancelled' } }), 201);
+    fake.refunds.set(Number(sent.providerRefundId), 'processed');
+    expect(ok(await call('POST', `admin/refunds/${sent.id}/check`, { token: refunder })).status).toBe('succeeded');
+    await app.get(OutboxRunner).drain();
+    const net = await prisma.$queryRaw<{ accountCode: string; balance: bigint }[]>`
+      SELECT l."accountCode", SUM(CASE WHEN l.side = 'credit' THEN l."amountMinor" ELSE -l."amountMinor" END)::bigint AS balance
+      FROM ledger.journal_lines l JOIN ledger.journal_entries e ON e.id = l."entryId"
+      WHERE e."paymentId" = ${paymentId}::uuid GROUP BY 1 ORDER BY 1`;
+    expect(Object.fromEntries(net.map((row) => [row.accountCode, row.balance]))).toEqual({ '1100': 0n, '2100': 0n });
+  });
+
+  it('refuses once a courier has collected the items, and over a change the staff member has not seen', async () => {
+    const { order, sellerOrderId } = await placed();
+    const stale = ok(await call('GET', `admin/orders/${order.id}`, { token: clerk })).version;
+    const shipment = ok(await send(sellerOrderId), 201);
+    ok(await call('POST', `admin/shipments/${shipment.id}/status`, { token: dispatcher, body: { status: 'picked_up' } }));
+    await app.get(OutboxRunner).drain();
+    expect((await cancel(order.id, { reason: 'Too late', version: stale })).status).toBe(409);
+    const current = ok(await call('GET', `admin/orders/${order.id}`, { token: clerk }));
+    expect(current.cannotCancelBecause).toMatch(/collected by a courier/);
+    const refused = await cancel(order.id, { reason: 'Too late', version: current.version });
+    expect(refused.status).toBe(422);
+    expect(refused.body).toMatchObject({ code: 'order.not_cancellable', detail: expect.stringMatching(/collected by a courier/) });
+  });
+
+  it('closes a stock issue order without touching stock', async () => {
+    const { token, listingId, checkout } = await openCheckout(2, 2);
+    const { reference } = ok(await call('POST', `store/checkout/${checkout.id}/payments`, { token, body: { gatewayId: paystackId } }), 201);
+    await prisma.stockReservation.updateMany({ where: { checkoutId: checkout.id }, data: { status: 'expired' } });
+    await prisma.stockItem.updateMany({ where: { listingId }, data: { reserved: { decrement: 2 }, onHand: { decrement: 2 } } });
+    fake.transactions.set(reference, { status: 'success', amount: 2750000, currency: 'NGN', id: txId() });
+    ok(await call('POST', `store/payments/${reference}/verify`, { token }));
+    const order = ok(await call('GET', `store/orders/by-checkout/${checkout.id}`, { token }));
+    expect(order.status).toBe('stock_issue');
+    expect(ok(await cancel(order.id, { reason: 'Sold out before payment' })).status).toBe('cancelled');
+    expect(await stockOf(listingId)).toEqual({ onHand: 0, reserved: 0 });
+  });
+
+  it('needs orders.manage and a reason', async () => {
+    const { order } = await placed();
+    const viewer = await staffToken(['payments.read']);
+    expect((await cancel(order.id, undefined, viewer)).status).toBe(403);
+    expect((await cancel(order.id, { reason: 'x' })).status).toBe(400);
+    expect((await cancel(randomUUID())).status).toBe(404);
+  });
+});
+
 describe('event delivery', () => {
   it('leaves nothing pending after a payment', async () => {
     await app.get(OutboxRunner).drain();

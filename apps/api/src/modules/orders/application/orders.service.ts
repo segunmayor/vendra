@@ -1,4 +1,4 @@
-import { ApplicationError, ConcurrencyConflict, Principal } from '../../../shared-kernel';
+import { ApplicationError, AuditEntry, ConcurrencyConflict, Principal } from '../../../shared-kernel';
 import { CheckoutService, PaidCheckout } from '../../checkout';
 import { ListingQueries } from '../../listings';
 import { Order, OrderAddress, OrderStatus, SellerOrderStatus, ShipmentProgress } from '../domain/order';
@@ -12,8 +12,8 @@ export interface OrderRepository {
   findByCheckout(checkoutId: string): Promise<Order | null>;
   findBySellerOrder(sellerOrderId: string): Promise<Order | null>;
   findBySellerOrders(sellerOrderIds: readonly string[]): Promise<Order[]>;
-  /** Saves status changes and events. Throws ConcurrencyConflict on a stale version. */
-  save(order: Order): Promise<void>;
+  /** Saves status changes, events and the audit entry. Throws ConcurrencyConflict on a stale version. */
+  save(order: Order, audit?: AuditEntry): Promise<void>;
   listForCustomer(customerId: string, limit: number): Promise<Order[]>;
   listRecent(limit: number, filter: OrderFilter): Promise<Order[]>;
   countByStatus(): Promise<Record<string, number>>;
@@ -36,6 +36,7 @@ type Checkouts = Pick<CheckoutService, 'paidCheckout'>;
 type Listings = Pick<ListingQueries, 'getOffers'>;
 
 const notFound = () => new ApplicationError('not_found', 'order.not_found', 'Order not found');
+const changed = () => new ApplicationError('conflict', 'order.changed', 'This order has just changed. Reload to see it as it is now.');
 
 export class OrderService {
   constructor(
@@ -45,6 +46,8 @@ export class OrderService {
     private readonly customers: CustomerDirectory,
     private readonly ids: { uuid(): string },
     private readonly clock: { now(): Date },
+    /** Delivers committed events at once, so stock is back on sale when staff look. */
+    private readonly deliver: () => Promise<void> = async () => undefined,
   ) {}
 
   /**
@@ -135,6 +138,33 @@ export class OrderService {
     );
   }
 
+  /**
+   * Staff cancel an order before anything leaves with a courier. `version` is the one the
+   * staff member was looking at, so a change they have not seen is never cancelled over.
+   */
+  async cancel(actor: Principal, id: string, reason: string, version?: number): Promise<Order> {
+    const order = await this.orders.findById(id);
+    if (!order) throw notFound();
+    if (version !== undefined && version !== order.snapshot.version) throw changed();
+    const before = order.snapshot.status;
+    order.cancel(reason, actor.accountId, this.clock.now());
+    try {
+      await this.orders.save(order, {
+        actorId: actor.accountId,
+        action: 'orders.cancelled',
+        targetType: 'order',
+        targetId: id,
+        before: { status: before },
+        after: { status: 'cancelled', reason: order.snapshot.cancellation!.reason },
+      });
+    } catch (error) {
+      if (error instanceof ConcurrencyConflict) throw changed();
+      throw error;
+    }
+    await this.deliver();
+    return order;
+  }
+
   /** Throws a DomainError explaining why these items cannot be sent now. */
   async assertShippable(sellerOrderId: string): Promise<void> {
     const order = await this.orders.findBySellerOrder(sellerOrderId);
@@ -185,6 +215,7 @@ export class OrderService {
 
 export { Order } from '../domain/order';
 export type { OrderStatus, ShipmentProgress } from '../domain/order';
+export { CANCEL_REASON_MAX } from '../domain/order';
 
 export interface SellerOrderContext {
   readonly orderId: string;

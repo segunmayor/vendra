@@ -510,6 +510,10 @@ model Order {
   shippingAddress Json
   version         Int           @default(0)
   placedAt        DateTime      @default(now()) @db.Timestamptz
+  /// Set together when staff cancel the order.
+  cancelledAt        DateTime? @db.Timestamptz
+  cancelledBy        String?   @db.Uuid
+  cancellationReason String?
   createdAt       DateTime      @default(now()) @db.Timestamptz
   updatedAt       DateTime      @updatedAt @db.Timestamptz
   sellerOrders    SellerOrder[]

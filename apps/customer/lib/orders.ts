@@ -2,7 +2,7 @@
 export const ORDER_STATUS: Record<string, { label: string; note: string }> = {
   placed: { label: 'Confirmed', note: 'We are preparing your order for delivery.' },
   stock_issue: { label: 'Refund due', note: 'An item sold out before your payment reached us. We will refund you in full and contact you.' },
-  cancelled: { label: 'Cancelled', note: 'This order was cancelled.' },
+  cancelled: { label: 'Cancelled', note: 'This order was cancelled and nothing will be delivered. We refund you to the card or account you paid with. Contact us if you have questions.' },
   fulfilled: { label: 'Delivered', note: 'Your order has been delivered.' },
 };
 

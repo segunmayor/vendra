@@ -3270,6 +3270,52 @@
         ]
       }
     },
+    "/v1/admin/orders/{id}/cancel": {
+      "post": {
+        "operationId": "adminCancelOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOrderResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel an order before anything leaves with a courier. Stock goes back on sale; refund separately.",
+        "tags": [
+          "admin orders"
+        ]
+      }
+    },
     "/v1/admin/seller-orders/{id}/shipments": {
       "post": {
         "operationId": "adminSendSellerOrder",
@@ -6621,6 +6667,11 @@
             "type": "boolean",
             "description": "Paid, with items not yet handed to a courier"
           },
+          "cancelledAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
           "subtotal": {
             "$ref": "#/components/schemas/MoneyDto"
           },
@@ -6675,6 +6726,26 @@
           "toSend"
         ]
       },
+      "CancellationDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "by": {
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "by",
+          "at"
+        ]
+      },
       "AdminOrderResponse": {
         "type": "object",
         "properties": {
@@ -6722,6 +6793,11 @@
             "type": "boolean",
             "description": "Paid, with items not yet handed to a courier"
           },
+          "cancelledAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
           "subtotal": {
             "$ref": "#/components/schemas/MoneyDto"
           },
@@ -6749,6 +6825,23 @@
           "customerEmail": {
             "type": "string",
             "nullable": true
+          },
+          "version": {
+            "type": "number"
+          },
+          "cancellation": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CancellationDto"
+              }
+            ]
+          },
+          "cannotCancelBecause": {
+            "type": "string",
+            "nullable": true,
+            "description": "Why staff cannot cancel it now; null when they can"
           }
         },
         "required": [
@@ -6769,7 +6862,26 @@
           "sellerOrders",
           "paymentId",
           "checkoutId",
-          "customerId"
+          "customerId",
+          "version"
+        ]
+      },
+      "CancelOrderRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 300,
+            "description": "Why, for the audit log and other staff"
+          },
+          "version": {
+            "type": "number",
+            "description": "The order version the staff member was looking at"
+          }
+        },
+        "required": [
+          "reason"
         ]
       },
       "SendShipmentDto": {

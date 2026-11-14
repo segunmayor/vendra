@@ -1305,6 +1305,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/orders/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel an order before anything leaves with a courier. Stock goes back on sale; refund separately. */
+        post: operations["adminCancelOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/seller-orders/{id}/shipments": {
         parameters: {
             query?: never;
@@ -2239,6 +2256,8 @@ export interface components {
             state: string;
             /** @description Paid, with items not yet handed to a courier */
             toSend: boolean;
+            /** Format: date-time */
+            cancelledAt?: string | null;
             subtotal: components["schemas"]["MoneyDto"];
             delivery: components["schemas"]["MoneyDto"];
             address: components["schemas"]["OrderAddressDto"];
@@ -2251,6 +2270,12 @@ export interface components {
             };
             /** @description Paid orders with items not yet handed to a courier */
             toSend: number;
+        };
+        CancellationDto: {
+            reason: string;
+            by: string;
+            /** Format: date-time */
+            at: string;
         };
         AdminOrderResponse: {
             id: string;
@@ -2270,6 +2295,8 @@ export interface components {
             state: string;
             /** @description Paid, with items not yet handed to a courier */
             toSend: boolean;
+            /** Format: date-time */
+            cancelledAt?: string | null;
             subtotal: components["schemas"]["MoneyDto"];
             delivery: components["schemas"]["MoneyDto"];
             address: components["schemas"]["OrderAddressDto"];
@@ -2278,6 +2305,16 @@ export interface components {
             checkoutId: string;
             customerId: string;
             customerEmail?: string | null;
+            version: number;
+            cancellation?: components["schemas"]["CancellationDto"] | null;
+            /** @description Why staff cannot cancel it now; null when they can */
+            cannotCancelBecause?: string | null;
+        };
+        CancelOrderRequest: {
+            /** @description Why, for the audit log and other staff */
+            reason: string;
+            /** @description The order version the staff member was looking at */
+            version?: number;
         };
         SendShipmentDto: {
             /**
@@ -4524,6 +4561,31 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminOrderResponse"];
+                };
+            };
+        };
+    };
+    adminCancelOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelOrderRequest"];
+            };
+        };
         responses: {
             200: {
                 headers: {

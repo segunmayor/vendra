@@ -31,7 +31,7 @@ Each step ends with tests passing before the next begins.
 | 7 | Orders: created from verified payment (done 12 Nov, with customer order history, staff order screens and a staff page) | 6 |
 | 8 | Shipping: manual dispatch and customer tracking (done 13 Nov) | 7 |
 | 9 | Vendor registration and verification (done 13 Nov) | 2 |
-| 10 | Security review, end-to-end test, staging, go-live checklist (code side done 14 Nov: [review](security-review.md), [checklist](go-live-checklist.md), `infrastructure/staging`; staging itself waits for a host) | All |
+| 10 | Security review, end-to-end test, staging, go-live checklist (code side done 14 Nov: [review](security-review.md), [checklist](go-live-checklist.md), `infrastructure/staging`; staging itself waits for a host). Staff order cancellation added 14 Nov | All |
 
 ## Critical path items outside the code
 

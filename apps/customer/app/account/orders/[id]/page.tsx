@@ -15,7 +15,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   await session.requireProfile();
   const order = await session.find((api) => api.GET('/v1/store/orders/{id}', { params: { path: { id } } }));
   if (!order) notFound();
-  const shipments = order.status === 'stock_issue' ? [] : await session.read((api) => api.GET('/v1/store/orders/{id}/shipments', { params: { path: { id } } }));
+  const shipments = order.status === 'stock_issue' || order.status === 'cancelled' ? [] : await session.read((api) => api.GET('/v1/store/orders/{id}/shipments', { params: { path: { id } } }));
   const latest = shipments[shipments.length - 1];
   const stage = stageOf(order.status, latest?.status);
   const status = ORDER_STATUS[order.status] ?? { label: order.status, note: '' };
@@ -34,7 +34,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         <h1 className="mt-2 text-2xl font-bold tracking-tight">Order {order.number}</h1>
         <p className="mt-1 text-muted">Placed {orderDate.format(new Date(order.placedAt))}. Quote this number if you contact us.</p>
         <div className="mt-6">
-          <Alert tone={order.status === 'stock_issue' ? 'warning' : 'success'}>
+          <Alert tone={order.status === 'stock_issue' || order.status === 'cancelled' ? 'warning' : 'success'}>
             <strong>{status.label}.</strong> {note}
           </Alert>
         </div>

@@ -1,10 +1,10 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiProperty, ApiPropertyOptional, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import { CurrentPrincipal, RequirePermission, Surface } from '../../../platform/http/auth.decorators';
 import { ZodPipe } from '../../../platform/http/zod.pipe';
 import { Money, Principal } from '../../../shared-kernel';
-import { Order, OrderService } from '../application/orders.service';
+import { CANCEL_REASON_MAX, Order, OrderService } from '../application/orders.service';
 
 const uuid = new ZodPipe(z.uuid());
 const STATUSES = ['placed', 'stock_issue', 'cancelled', 'fulfilled'] as const;
@@ -13,6 +13,21 @@ const listSchema = z.object({
   number: z.string().trim().regex(/^\d{1,12}$/).optional(),
   toSend: z.enum(['true']).transform(() => true).optional(),
 });
+const cancelSchema = z.object({
+  reason: z.string().trim().min(3).max(CANCEL_REASON_MAX),
+  version: z.number().int().nonnegative().optional(),
+});
+
+class CancelOrderRequest {
+  @ApiProperty({ minLength: 3, maxLength: CANCEL_REASON_MAX, description: 'Why, for the audit log and other staff' }) reason!: string;
+  @ApiPropertyOptional({ description: 'The order version the staff member was looking at' }) version?: number;
+}
+
+class CancellationDto {
+  @ApiProperty() reason!: string;
+  @ApiProperty() by!: string;
+  @ApiProperty() at!: Date;
+}
 
 class MoneyDto {
   @ApiProperty({ example: '1500000' }) amountMinor!: string;
@@ -60,6 +75,7 @@ export class OrderSummaryResponse {
 }
 
 export class OrderResponse extends OrderSummaryResponse {
+  @ApiPropertyOptional({ type: Date, nullable: true }) cancelledAt!: Date | null;
   @ApiProperty({ type: MoneyDto }) subtotal!: MoneyDto;
   @ApiProperty({ type: MoneyDto }) delivery!: MoneyDto;
   @ApiProperty({ type: OrderAddressDto }) address!: OrderAddressDto;
@@ -71,6 +87,9 @@ export class AdminOrderResponse extends OrderResponse {
   @ApiProperty() checkoutId!: string;
   @ApiProperty() customerId!: string;
   @ApiPropertyOptional({ type: String, nullable: true }) customerEmail!: string | null;
+  @ApiProperty() version!: number;
+  @ApiPropertyOptional({ type: CancellationDto, nullable: true }) cancellation!: CancellationDto | null;
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'Why staff cannot cancel it now; null when they can' }) cannotCancelBecause!: string | null;
 }
 
 export class OrderCountsResponse {
@@ -102,6 +121,7 @@ function detail(order: Order): OrderResponse {
   const state = order.snapshot;
   return {
     ...summary(order),
+    cancelledAt: state.cancellation?.at ?? null,
     subtotal: money(state.subtotal),
     delivery: money(state.delivery),
     address: { ...state.address },
@@ -119,6 +139,20 @@ function detail(order: Order): OrderResponse {
         lineTotal: money(line.lineTotal),
       })),
     })),
+  };
+}
+
+function adminDetail(order: Order, customerEmail: string | null): AdminOrderResponse {
+  const state = order.snapshot;
+  return {
+    ...detail(order),
+    paymentId: state.paymentId,
+    checkoutId: state.checkoutId,
+    customerId: state.customerId,
+    customerEmail,
+    version: state.version,
+    cancellation: state.cancellation ? { ...state.cancellation } : null,
+    cannotCancelBecause: order.cannotCancelBecause,
   };
 }
 
@@ -181,7 +215,20 @@ export class AdminOrdersController {
   @ApiOkResponse({ type: AdminOrderResponse })
   async get(@Param('id', uuid) id: string): Promise<AdminOrderResponse> {
     const { order, customerEmail } = await this.orders.get(id);
-    const state = order.snapshot;
-    return { ...detail(order), paymentId: state.paymentId, checkoutId: state.checkoutId, customerId: state.customerId, customerEmail };
+    return adminDetail(order, customerEmail);
+  }
+
+  @Post(':id/cancel')
+  @HttpCode(200)
+  @ApiOperation({ operationId: 'adminCancelOrder', summary: 'Cancel an order before anything leaves with a courier. Stock goes back on sale; refund separately.' })
+  @ApiOkResponse({ type: AdminOrderResponse })
+  async cancel(
+    @CurrentPrincipal() principal: Principal,
+    @Param('id', uuid) id: string,
+    @Body(new ZodPipe(cancelSchema)) body: CancelOrderRequest,
+  ): Promise<AdminOrderResponse> {
+    await this.orders.cancel(principal, id, body.reason, body.version);
+    const { order, customerEmail } = await this.orders.get(id);
+    return adminDetail(order, customerEmail);
   }
 }

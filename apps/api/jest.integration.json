@@ -5,5 +5,8 @@
     "<rootDir>/test/integration"
   ],
   "testRegex": ".*\\.int-spec\\.ts$",
-  "testTimeout": 30000
+  "testTimeout": 30000,
+  "setupFilesAfterEnv": [
+    "<rootDir>/test/integration/setup.ts"
+  ]
 }

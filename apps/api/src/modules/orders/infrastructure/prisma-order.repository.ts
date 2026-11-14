@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
+import { appendAudit } from '../../../platform/audit/audit';
 import { appendToOutbox } from '../../../platform/outbox/outbox';
-import { ConcurrencyConflict, Money } from '../../../shared-kernel';
+import { AuditEntry, ConcurrencyConflict, Money } from '../../../shared-kernel';
 import { OrderFilter, OrderRepository } from '../application/orders.service';
 
 /** Paid, with items still waiting to be handed to a courier. */
@@ -40,6 +41,10 @@ function toOrder(row: Row): Order {
       })),
     })),
     placedAt: row.placedAt,
+    cancellation:
+      row.cancelledAt && row.cancelledBy && row.cancellationReason
+        ? { at: row.cancelledAt, by: row.cancelledBy, reason: row.cancellationReason }
+        : null,
     version: row.version,
   });
 }
@@ -122,15 +127,25 @@ export class PrismaOrderRepository implements OrderRepository {
     return rows.map(toOrder);
   }
 
-  async save(order: Order): Promise<void> {
+  async save(order: Order, audit?: AuditEntry): Promise<void> {
     const state = order.snapshot;
     const events = order.pullEvents();
     await this.prisma.$transaction(async (tx) => {
-      const { count } = await tx.order.updateMany({ where: { id: state.id, version: state.version }, data: { status: state.status, version: { increment: 1 } } });
+      const { count } = await tx.order.updateMany({
+        where: { id: state.id, version: state.version },
+        data: {
+          status: state.status,
+          cancelledAt: state.cancellation?.at ?? null,
+          cancelledBy: state.cancellation?.by ?? null,
+          cancellationReason: state.cancellation?.reason ?? null,
+          version: { increment: 1 },
+        },
+      });
       if (count !== 1) throw new ConcurrencyConflict('Order', state.id);
       for (const seller of state.sellerOrders) {
         await tx.sellerOrder.update({ where: { id: seller.id }, data: { status: seller.status } });
       }
+      if (audit) await appendAudit(tx, audit);
       await appendToOutbox(tx, events);
     });
     order.markSaved();

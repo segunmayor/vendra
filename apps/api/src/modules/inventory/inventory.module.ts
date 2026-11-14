@@ -1,5 +1,6 @@
-import { Inject, Injectable, Logger, Module, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import { Inject, Injectable, Logger, Module, OnApplicationBootstrap, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { ENV, Env } from '../../platform/config/env';
+import { OutboxRegistry } from '../../platform/outbox/outbox-runner';
 import { SettingsReader } from '../settings';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../platform/prisma/prisma.service';
@@ -39,6 +40,24 @@ class ReservationSweeper implements OnApplicationBootstrap, OnApplicationShutdow
   }
 }
 
+/** A cancelled order's sold stock goes back on sale. */
+@Injectable()
+class InventoryReactions implements OnModuleInit {
+  constructor(
+    private readonly registry: OutboxRegistry,
+    private readonly commands: InventoryCommands,
+  ) {}
+
+  onModuleInit(): void {
+    this.registry.on('OrderCancelled', async (event) => {
+      const { orderId, checkoutId, stockTaken } = event.payload;
+      if (typeof orderId !== 'string' || typeof checkoutId !== 'string') throw new Error(`OrderCancelled ${event.id} is incomplete`);
+      if (stockTaken === false) return;
+      await this.commands.restock(checkoutId, orderId);
+    });
+  }
+}
+
 @Module({
   imports: [ListingsModule],
   controllers: [InventoryController],
@@ -62,6 +81,7 @@ class ReservationSweeper implements OnApplicationBootstrap, OnApplicationShutdow
         new InventoryCommands(new PrismaReservationStore(prisma), { now: () => new Date() }, settings),
     },
     ReservationSweeper,
+    InventoryReactions,
     {
       provide: InventoryQueries,
       inject: [PrismaService],

@@ -95,6 +95,13 @@ export class ShippingService {
     if (input.version !== undefined && input.version !== shipment.version) {
       throw new ApplicationError('conflict', 'shipment.changed', 'Someone else has just updated this shipment. Reload to see where it is now.');
     }
+    if (input.status === 'picked_up') {
+      // The order may have been cancelled after the items were handed over for collection.
+      const order = await this.orders.sellerOrder(shipment.sellerOrderId);
+      if (order?.orderStatus === 'cancelled') {
+        throw new ApplicationError('conflict', 'shipment.order_cancelled', 'This order was cancelled. Take the items back from the courier.');
+      }
+    }
     const before = shipment.currentStatus;
     const note = input.note?.trim() || null;
     const now = this.clock.now();
@@ -120,6 +127,22 @@ export class ShippingService {
     }
     await this.deliver();
     return view(shipment);
+  }
+
+  /**
+   * When an order is cancelled, shipments still waiting for collection are cancelled with it.
+   * Safe to repeat. Shipments already collected cannot exist: an order with collected items
+   * cannot be cancelled.
+   */
+  async cancelUncollected(sellerOrderIds: readonly string[]): Promise<number> {
+    let cancelled = 0;
+    for (const shipment of await this.shipments.listForSellerOrders(sellerOrderIds)) {
+      if (!shipment.nextStatuses.includes('cancelled')) continue;
+      shipment.transitionTo('cancelled', this.clock.now(), 'Order cancelled');
+      await this.shipments.save(shipment);
+      cancelled += 1;
+    }
+    return cancelled;
   }
 
   /** Staff: every shipment for an order, oldest first. */

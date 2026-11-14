@@ -1,6 +1,6 @@
 import { Injectable, Module, OnModuleInit } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { OutboxRegistry } from '../../platform/outbox/outbox-runner';
+import { OutboxRegistry, OutboxRunner } from '../../platform/outbox/outbox-runner';
 import { PrismaService } from '../../platform/prisma/prisma.service';
 import { CheckoutService } from '../checkout';
 import { CheckoutModule } from '../checkout/checkout.module';
@@ -59,9 +59,17 @@ class OrderReactions implements OnModuleInit {
   providers: [
     {
       provide: OrderService,
-      inject: [PrismaService, CheckoutService, ListingQueries, AuthService],
-      useFactory: (prisma: PrismaService, checkout: CheckoutService, listings: ListingQueries, auth: AuthService) =>
-        new OrderService(new PrismaOrderRepository(prisma), checkout, listings, { emailOf: (id) => auth.emailOf(id) }, { uuid: randomUUID }, { now: () => new Date() }),
+      inject: [PrismaService, CheckoutService, ListingQueries, AuthService, OutboxRunner],
+      useFactory: (prisma: PrismaService, checkout: CheckoutService, listings: ListingQueries, auth: AuthService, outbox: OutboxRunner) =>
+        new OrderService(
+          new PrismaOrderRepository(prisma),
+          checkout,
+          listings,
+          { emailOf: (id) => auth.emailOf(id) },
+          { uuid: randomUUID },
+          { now: () => new Date() },
+          () => outbox.drain(),
+        ),
     },
     OrderReactions,
   ],

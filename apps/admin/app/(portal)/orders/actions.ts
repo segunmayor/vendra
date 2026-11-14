@@ -29,3 +29,13 @@ export async function moveShipment(orderId: string, shipmentId: string, version:
   revalidatePath('/shipments');
   return toFormState(result, 'Saved.');
 }
+
+export async function cancelOrder(orderId: string, version: number, _state: FormState, data: FormData): Promise<FormState> {
+  const reason = text(data, 'reason');
+  if (reason.length < 3) return invalid('Say why the order is being cancelled');
+  const result = await session.mutate((api) => api.POST('/v1/admin/orders/{id}/cancel', { params: { path: { id: orderId } }, body: { reason, version } }));
+  revalidatePath(`/orders/${orderId}`);
+  revalidatePath('/orders');
+  revalidatePath('/');
+  return toFormState(result, 'Cancelled. The items are back in stock.');
+}

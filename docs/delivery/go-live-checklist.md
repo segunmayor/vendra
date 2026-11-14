@@ -44,6 +44,7 @@ Use a real card and a small real amount, then refund it.
 - [ ] The ledger shows the payment in prepayments, then moved to sales and delivery charges.
 - [ ] Refund the rehearsal order in full from Admin (this needs two-step sign-in). Paystack confirms the refund, and the ledger debits "Refunds after delivery" (4900), since the sale was already recorded.
 - [ ] Seller: apply with test documents; staff ask for changes, then reject. Remove the test application's account afterwards if wanted.
+- [ ] Place a second small order, hand it to a courier, then cancel it before collection. The stock goes back, the shipment shows cancelled, and the order page shows the amount still to refund. Refund it: the ledger debits prepayments (2100), not 4900.
 - [ ] Staff without a permission cannot open that page. A signed-out visitor to Admin is sent to sign in.
 
 ## Launch day watch list
@@ -58,7 +59,7 @@ There is no monitoring service yet (Sentry and alerts are planned), so check the
 ## Known limits at launch
 
 Tell support and staff about these:
-- no order cancellation by the customer: staff refund instead;
+- customers cannot cancel orders themselves: staff cancel from the order page before a courier collects the items, then refund from the payment;
 - no emails or SMS;
 - approved sellers cannot list products yet;
 - staff cannot unsuspend a staff account;

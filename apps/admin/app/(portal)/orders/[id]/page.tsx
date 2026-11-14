@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { can, session } from '../../../../lib/session';
 import { dateTime, orderBadge, SELLER_LABEL } from '../labels';
+import { CancelOrder } from './cancel';
 import { Delivery } from './delivery';
 
 export const metadata: Metadata = { title: 'Order' };
@@ -18,6 +19,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     can('shipments.manage'),
     session.read((api) => api.GET('/v1/admin/orders/{id}/shipments', { params: { path: { id } } })),
   ]);
+  // Cancelled and stock issue orders are owed a refund: show how much is still to go back.
+  const owed = order.status === 'cancelled' || order.status === 'stock_issue';
+  const payment = owed && seePayment ? await session.find((api) => api.GET('/v1/admin/payments/{id}', { params: { path: { id: order.paymentId } } })) : null;
   const badge = orderBadge(order);
   const money = (value: { amountMinor: string; currency: string }) => formatMoney(value.amountMinor, value.currency);
   const options = (values: Record<string, string>) => Object.entries(values).map(([key, value]) => `${key}: ${value}`).join(', ');
@@ -34,6 +38,28 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         description={`Placed ${dateTime.format(new Date(order.placedAt))}.`}
         actions={<Badge tone={badge.tone}>{badge.label}</Badge>}
       />
+      {order.cancellation ? (
+        <div className="mb-6">
+          <Alert tone="warning">
+            Cancelled {dateTime.format(new Date(order.cancellation.at))}: {order.cancellation.reason}
+          </Alert>
+        </div>
+      ) : null}
+      {payment && ['succeeded', 'partially_refunded', 'refunded'].includes(payment.status) ? (
+        <div className="mb-6">
+          {BigInt(payment.refundableMinor) > 0n ? (
+            <Alert>
+              {formatMoney(payment.refundableMinor, payment.currency)} of the payment has not been refunded.{' '}
+              <Link href={`/payments/${order.paymentId}`} className="font-semibold underline underline-offset-2">
+                Refund the customer
+              </Link>
+              {BigInt(payment.refundPendingMinor) > 0n ? ` (${formatMoney(payment.refundPendingMinor, payment.currency)} is already on its way).` : '.'}
+            </Alert>
+          ) : (
+            <Alert tone="success">Refunded in full.</Alert>
+          )}
+        </div>
+      ) : null}
       {order.status === 'stock_issue' ? (
         <div className="mb-6">
           <Alert>
@@ -47,7 +73,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 </Link>
               </>
             ) : null}
-            , and call them on {order.address.phone}.
+            , call them on {order.address.phone}, then cancel the order to close it.
           </Alert>
         </div>
       ) : null}
@@ -99,6 +125,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           </Card>
         </div>
         <div className="space-y-6">
+          {order.cannotCancelBecause === null ? <CancelOrder orderId={order.id} version={order.version} stockIssue={order.status === 'stock_issue'} /> : null}
           <Card className="p-6 text-sm">
             <h2 className="font-semibold">Deliver to</h2>
             <address className="mt-2 not-italic leading-6">

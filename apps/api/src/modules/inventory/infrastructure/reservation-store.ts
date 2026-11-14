@@ -122,6 +122,28 @@ export class PrismaReservationStore implements ReservationStore {
     });
   }
 
+  async restock(checkoutId: string, orderId: string, now: Date): Promise<number> {
+    return this.prisma.$transaction(async (tx) => {
+      const items = await tx.stockReservation.findMany({ where: { checkoutId, status: 'committed' }, select: { stockItemId: true } });
+      if (items.length === 0) return 0;
+      await lockStock(tx, Prisma.sql`"id" = ANY(${items.map((item) => item.stockItemId)}::uuid[])`);
+      // Re-checked under the lock, so a repeated event returns nothing twice.
+      const returned = await tx.$queryRaw<Released[]>`
+        UPDATE "inventory"."stock_reservations" SET "status" = 'returned'
+        WHERE "checkoutId" = ${checkoutId}::uuid AND "status" = 'committed'
+        RETURNING "stockItemId", "quantity"`;
+      for (const row of returned) {
+        await tx.$executeRaw`
+          UPDATE "inventory"."stock_items" SET "onHand" = "onHand" + ${row.quantity}, "version" = "version" + 1
+          WHERE "id" = ${row.stockItemId}::uuid`;
+        await tx.stockMovement.create({
+          data: { stockItemId: row.stockItemId, delta: row.quantity, reason: 'order_cancelled', sourceType: 'order', sourceId: orderId, createdAt: now },
+        });
+      }
+      return returned.reduce((sum, row) => sum + row.quantity, 0);
+    });
+  }
+
   async releaseExpired(now: Date, limit: number): Promise<number> {
     return this.prisma.$transaction(async (tx) => {
       const [lock] = await tx.$queryRaw<{ acquired: boolean }[]>`SELECT pg_try_advisory_xact_lock(${SWEEP_LOCK}) AS acquired`;

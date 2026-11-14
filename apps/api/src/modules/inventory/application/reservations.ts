@@ -28,6 +28,8 @@ export interface ReservationStore {
   /** Turns held units into a sale: on-hand and reserved both fall, and a sale movement is recorded. */
   commit(checkoutId: string, now: Date): Promise<HeldReservation[]>;
   hasCommitted(checkoutId: string): Promise<boolean>;
+  /** Puts a cancelled order's sold stock back on hand, recording a movement. Returns the units returned. */
+  restock(checkoutId: string, orderId: string, now: Date): Promise<number>;
   releaseExpired(now: Date, limit: number): Promise<number>;
   held(checkoutId: string): Promise<HeldReservation[]>;
 }
@@ -88,6 +90,11 @@ export class InventoryCommands {
 
   hasCommitted(checkoutId: string): Promise<boolean> {
     return this.store.hasCommitted(checkoutId);
+  }
+
+  /** A cancelled order's stock goes back on sale. Safe to repeat: nothing is returned twice. */
+  restock(checkoutId: string, orderId: string): Promise<number> {
+    return this.store.restock(checkoutId, orderId, this.clock.now());
   }
 
   /** Releases lapsed holds in batches. Returns the number released. */

@@ -4,7 +4,8 @@ import { AggregateRoot, DomainError, Money } from '../../../shared-kernel';
  * - placed: paid, waiting to be packed and sent.
  * - stock_issue: paid, but an item sold out before the payment arrived. Needs a refund.
  * - fulfilled: every seller order delivered.
- * - cancelled: reserved for staff cancellation (a later step).
+ * - cancelled: staff cancelled it before anything left with a courier. Stock goes back on sale;
+ *   the refund is a separate step, through the payment.
  */
 export type OrderStatus = 'placed' | 'stock_issue' | 'cancelled' | 'fulfilled';
 export type SellerOrderStatus = 'pending' | 'cancelled' | 'dispatched' | 'delivered';
@@ -38,6 +39,14 @@ export interface SellerOrderState {
   readonly lines: readonly OrderLineState[];
 }
 
+export interface OrderCancellation {
+  readonly reason: string;
+  readonly by: string;
+  readonly at: Date;
+}
+
+export const CANCEL_REASON_MAX = 300;
+
 export interface OrderState {
   readonly id: string;
   /** Short, for customers to quote on the phone. */
@@ -52,6 +61,7 @@ export interface OrderState {
   readonly total: Money;
   readonly sellerOrders: readonly SellerOrderState[];
   readonly placedAt: Date;
+  readonly cancellation: OrderCancellation | null;
   readonly version: number;
 }
 
@@ -109,6 +119,7 @@ export class Order extends AggregateRoot {
       total: input.total,
       sellerOrders: [...bySeller].map(([sellerId, lines]) => ({ id: input.newId(), sellerId, status: 'pending', lines })),
       placedAt: input.now,
+      cancellation: null,
       version: 0,
     });
     order.raise({
@@ -177,6 +188,55 @@ export class Order extends AggregateRoot {
       });
     }
     return true;
+  }
+
+  /** Why this order cannot be cancelled now, or null if it can. */
+  get cannotCancelBecause(): string | null {
+    const { status, sellerOrders } = this.state;
+    if (status === 'cancelled') return 'It is already cancelled';
+    if (status === 'fulfilled') return 'It has been delivered. Refund the customer from the payment instead';
+    if (sellerOrders.some((seller) => seller.status !== 'pending')) {
+      return 'Items have already been collected by a courier. Wait until they are delivered or back at Vendra';
+    }
+    return null;
+  }
+
+  /**
+   * Staff cancel an order before anything has left with a courier. Every seller order is
+   * cancelled with it. Inventory puts sold stock back and shipping cancels any shipment still
+   * waiting for collection, both from `OrderCancelled`. Money is refunded separately.
+   */
+  cancel(reason: string, actorId: string, now: Date): void {
+    const why = reason.trim();
+    if (why.length < 3) throw new DomainError('order.cancel_reason_required', 'Say why the order is being cancelled');
+    if (why.length > CANCEL_REASON_MAX) throw new DomainError('order.cancel_reason_too_long', `Keep the reason under ${CANCEL_REASON_MAX} characters`);
+    const blocked = this.cannotCancelBecause;
+    if (blocked) throw new DomainError('order.not_cancellable', `This order cannot be cancelled. ${blocked}.`);
+
+    const before = this.state.status;
+    this.state = {
+      ...this.state,
+      status: 'cancelled',
+      sellerOrders: this.state.sellerOrders.map((seller) => ({ ...seller, status: 'cancelled' })),
+      cancellation: { reason: why, by: actorId, at: now },
+    };
+    this.raise({
+      type: 'OrderCancelled',
+      aggregateId: this.state.id,
+      occurredAt: now,
+      payload: {
+        orderId: this.state.id,
+        number: this.state.number,
+        checkoutId: this.state.checkoutId,
+        paymentId: this.state.paymentId,
+        customerId: this.state.customerId,
+        sellerOrderIds: this.state.sellerOrders.map((seller) => seller.id),
+        // A stock issue order never took stock, so there is nothing to put back.
+        stockTaken: before === 'placed',
+        totalMinor: this.state.total.minor.toString(),
+        currency: this.state.total.currency,
+      },
+    });
   }
 
   /** Only a paid order with secured stock can be sent. */

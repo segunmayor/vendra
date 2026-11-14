@@ -36,7 +36,9 @@ export function Delivery({
   return (
     <Card className="p-6">
       <h2 className="font-semibold">Delivery</h2>
-      {shipments.length === 0 && !canSend ? <p className="mt-2 text-sm text-muted">Not sent yet.</p> : null}
+      {shipments.length === 0 && !canSend ? (
+        <p className="mt-2 text-sm text-muted">{orderStatus === 'cancelled' ? 'Cancelled before it was sent.' : 'Not sent yet.'}</p>
+      ) : null}
 
       {shipments
         .slice()
