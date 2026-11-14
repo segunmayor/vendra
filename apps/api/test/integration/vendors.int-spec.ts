@@ -238,6 +238,9 @@ describe('seller applications', () => {
     ok(await call('PUT', 'vendor/application', { token: other.token, body: details() }));
     expect((await call('GET', `vendor/application/documents/${file.documents[0].id}`, { token: other.token })).status).toBe(404);
     expect((await call('DELETE', `vendor/application/documents/${file.documents[0].id}`, { token: other.token })).status).toBe(422);
+    // A file removed before it was ever sent is deleted outright, not kept.
+    ok(await call('DELETE', `vendor/application/documents/${file.documents[0].id}`, { token: seller.token }));
+    expect(await prisma.sellerDocument.count({ where: { id: file.documents[0].id } })).toBe(0);
     expect((await call('GET', 'admin/sellers', { token: seller.token })).status).toBe(401);
 
     const shopper = ok(await call('POST', 'store/auth/register', { body: { email: `shop_${randomUUID()}@example.ng`, password: PASSWORD } }), 201).accessToken;

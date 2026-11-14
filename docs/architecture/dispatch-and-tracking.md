@@ -47,3 +47,9 @@ Every step records `ShipmentStatusChanged` in the same transaction, and the API 
 - Splitting one seller order across several parcels sent at the same time. The data model allows many shipments per seller order. Only the "one open at a time" index would need to become a per-item check.
 - Customer notifications (email or SMS) on each step: no provider chosen yet.
 - A live carrier integration (quotes, booking, tracking feed).
+
+## Refunds and the ledger (added 14 November)
+
+Each journal entry records the payment it concerns. Two rules follow from that:
+- **Delivery:** prepayments are debited by what the ledger still holds for the payment. The delivery charge is credited first and the rest goes to sales. After a full refund before delivery, nothing is posted.
+- **Refund:** comes out of prepayments up to what is still held. Anything beyond that was already recorded as a sale, so it is debited to "Refunds after delivery" (setting `payments.ledgerRefundsAfterDeliveryAccount`, default 4900).

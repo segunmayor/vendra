@@ -17,3 +17,5 @@ Vendra is a Nigerian multi-category retail and marketplace platform owned by Dat
 | [Payments and logistics](architecture/payments-and-logistics.md) | Provider-independent payment and shipment design |
 | [Brand and design system](design/brand-and-design-system.md) | Brand direction, tokens, per-portal experience |
 | [Launch scope and plan](delivery/launch-scope.md) | What ships on 18 November 2026, and the vertical build order |
+| [Security review](delivery/security-review.md) | What was checked before launch, what was fixed, and accepted risks |
+| [Go-live checklist](delivery/go-live-checklist.md) | Launch-day steps, the rehearsal, and what to watch in the first week |

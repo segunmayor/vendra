@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Injectable, Logger, Module, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ENV, Env } from '../../platform/config/env';
 import { PrismaService } from '../../platform/prisma/prisma.service';
@@ -24,9 +24,36 @@ import { StaffController } from './interface/staff.controller';
 
 const clock: Clock = { now: () => new Date() };
 
+/** The longest window any sign-in or sign-up limit looks back over, plus an hour. */
+const THROTTLE_RETENTION_MS = 25 * 3_600_000;
+
+/** Hourly, deletes sign-in and sign-up records no limit can still use (they hold IP addresses). */
+@Injectable()
+class ThrottlePurge implements OnApplicationBootstrap, OnApplicationShutdown {
+  private readonly logger = new Logger('ThrottlePurge');
+  private timer: NodeJS.Timeout | undefined;
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  onApplicationBootstrap(): void {
+    this.timer = setInterval(() => {
+      new PrismaLoginThrottle(this.prisma).purgeBefore(new Date(Date.now() - THROTTLE_RETENTION_MS)).then(
+        (count) => count > 0 && this.logger.log(`Deleted ${count} old sign-in records`),
+        (error: unknown) => this.logger.error(error instanceof Error ? error.message : String(error)),
+      );
+    }, 3_600_000);
+    this.timer.unref();
+  }
+
+  onApplicationShutdown(): void {
+    clearInterval(this.timer);
+  }
+}
+
 @Module({
   controllers: [...authControllers, StaffController],
   providers: [
+    ThrottlePurge,
     {
       provide: MfaService,
       inject: [PrismaService, ENV, SettingsReader],

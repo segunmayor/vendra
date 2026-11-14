@@ -1,0 +1,47 @@
+# HTTPS certificates are issued automatically once DNS points at this host.
+{
+	email {$ACME_EMAIL}
+}
+
+(common) {
+	encode zstd gzip
+	# Uploads: seller documents are at most 10 MB; leave room for the form around them.
+	request_body {
+		max_size 12MB
+	}
+	log {
+		output stdout
+		format json
+	}
+}
+
+{$STORE_DOMAIN} {
+	import common
+	reverse_proxy customer:3000
+}
+
+{$SELLERS_DOMAIN} {
+	import common
+	reverse_proxy vendor:3000
+}
+
+{$ADMIN_DOMAIN} {
+	import common
+	# Optional: limit Admin to office or VPN addresses (space-separated CIDRs in ADMIN_ALLOWED_IPS).
+	@outside not remote_ip {$ADMIN_ALLOWED_IPS}
+	respond @outside "Not found" 404
+	reverse_proxy admin:3000
+}
+
+{$API_DOMAIN} {
+	import common
+	# Only what must be public: health, the storefront's public reads, and payment webhooks.
+	# Portals reach every other route over the private network.
+	@public path /v1/health /v1/health/ready /v1/webhooks/payments/*
+	handle @public {
+		reverse_proxy api:4000
+	}
+	handle {
+		respond "Not found" 404
+	}
+}

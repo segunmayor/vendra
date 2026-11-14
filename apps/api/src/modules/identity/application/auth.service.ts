@@ -70,9 +70,16 @@ export class AuthService {
     return (await this.settings.get('security.staffSessionHours')) * HOUR;
   }
 
-  async register(audience: Exclude<Audience, 'admin'>, email: string, password: string): Promise<IssuedSession> {
+  /** `ip` limits how many accounts one address can create, so sign-up cannot be scripted at scale. */
+  async register(audience: Exclude<Audience, 'admin'>, email: string, password: string, ip: string): Promise<IssuedSession> {
     assertPasswordAllowed(password, await this.settings.get('security.passwordMinLength'));
     const now = this.clock.now();
+    const key = `ip:register:${ip}`;
+    const limit = await this.settings.get('security.registrationsPerAddressPerHour');
+    if (await this.throttle.isBlocked([{ key, limit }], new Date(now.getTime() - HOUR))) {
+      throw new ApplicationError('rate_limited', 'auth.too_many_registrations', 'Too many new accounts from your network. Try again later.');
+    }
+    await this.throttle.recordFailure([key], now);
     const account = Account.register({
       id: this.secrets.uuid(),
       audience,

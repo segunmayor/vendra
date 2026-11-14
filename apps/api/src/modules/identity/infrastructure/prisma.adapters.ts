@@ -259,6 +259,11 @@ export class PrismaLoginThrottle implements LoginThrottle {
   async clear(key: string): Promise<void> {
     await this.prisma.loginFailure.deleteMany({ where: { key } });
   }
+
+  /** Records name IP addresses, which are personal data: keep them only while a limit can use them. */
+  async purgeBefore(cutoff: Date): Promise<number> {
+    return (await this.prisma.loginFailure.deleteMany({ where: { occurredAt: { lt: cutoff } } })).count;
+  }
 }
 
 export class PrismaAuditTrail implements AuditTrail {

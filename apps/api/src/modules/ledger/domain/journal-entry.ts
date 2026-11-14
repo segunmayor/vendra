@@ -14,6 +14,8 @@ export class JournalEntry {
     readonly sourceId: string,
     readonly postedAt: Date,
     readonly lines: readonly JournalLine[],
+    /** The customer payment this entry concerns, when there is one. */
+    readonly paymentId: string | null = null,
   ) {}
 
   static post(input: {
@@ -22,6 +24,7 @@ export class JournalEntry {
     sourceId: string;
     postedAt: Date;
     lines: readonly JournalLine[];
+    paymentId?: string | null;
   }): JournalEntry {
     const { lines } = input;
     const first = lines[0];
@@ -42,7 +45,7 @@ export class JournalEntry {
     if (!total('debit').equals(total('credit'))) {
       throw new DomainError('ledger.unbalanced', 'Debits must equal credits');
     }
-    return new JournalEntry(input.id, input.sourceType, input.sourceId, input.postedAt, [...lines]);
+    return new JournalEntry(input.id, input.sourceType, input.sourceId, input.postedAt, [...lines], input.paymentId ?? null);
   }
 
   /** Corrections are new entries with sides swapped. Entries are never edited. */
@@ -52,6 +55,7 @@ export class JournalEntry {
       sourceType: 'reversal',
       sourceId: this.id,
       postedAt,
+      paymentId: this.paymentId,
       lines: this.lines.map((line) => ({
         ...line,
         side: line.side === 'debit' ? 'credit' : 'debit',

@@ -618,6 +618,34 @@ describe('dispatch and delivery', () => {
   const step = (shipmentId: string, status: string, extra: Record<string, unknown> = {}) => call('POST', `admin/shipments/${shipmentId}/status`, { token: dispatcher, body: { status, ...extra } });
   const staffOrder = async (id: string) => ok(await call('GET', `admin/orders/${id}`, { token: clerk }));
 
+  it('records a refund after delivery against refunds, leaving prepayments at zero', async () => {
+    const refunder = await staffToken(['payments.read', 'orders.refund']);
+    const { order, sellerOrderId } = await placed();
+    const shipment = ok(await send(sellerOrderId), 201);
+    for (const status of ['picked_up', 'in_transit', 'out_for_delivery', 'delivered']) ok(await step(shipment.id, status));
+    await app.get(OutboxRunner).drain();
+    expect((await staffOrder(order.id)).status).toBe('fulfilled');
+
+    const { paymentId } = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    const payment = { id: paymentId };
+    const reply = await call('POST', `admin/payments/${payment.id}/refunds`, { token: refunder, body: { amountMinor: '2750000', reason: 'Returned after delivery' } });
+    const sent = ok(reply, 201);
+    fake.refunds.set(Number(sent.providerRefundId), 'processed');
+    expect(ok(await call('POST', `admin/refunds/${sent.id}/check`, { token: refunder })).status).toBe('succeeded');
+    await app.get(OutboxRunner).drain();
+
+    const refundEntry = await prisma.journalEntry.findUniqueOrThrow({ where: { sourceType_sourceId: { sourceType: 'refund_paid', sourceId: sent.id } }, include: { lines: true } });
+    expect(refundEntry.lines.map((line) => [line.accountCode, line.side, line.amountMinor]).sort()).toEqual([
+      ['1100', 'credit', 2750000n],
+      ['4900', 'debit', 2750000n],
+    ]);
+    const net = await prisma.$queryRaw<{ accountCode: string; balance: bigint }[]>`
+      SELECT l."accountCode", SUM(CASE WHEN l.side = 'credit' THEN l."amountMinor" ELSE -l."amountMinor" END)::bigint AS balance
+      FROM ledger.journal_lines l JOIN ledger.journal_entries e ON e.id = l."entryId"
+      WHERE e."paymentId" = ${payment.id}::uuid GROUP BY 1 ORDER BY 1`;
+    expect(Object.fromEntries(net.map((row) => [row.accountCode, row.balance]))).toEqual({ '1100': 0n, '2100': 0n, '4000': 2500000n, '4100': 250000n, '4900': -2750000n });
+  });
+
   it('follows a parcel from courier to door, completes the order and recognises the sale in the ledger', async () => {
     const { token, order, sellerOrderId } = await placed();
     const waybill = `GIG ${unique()}/A`;
@@ -735,5 +763,24 @@ describe('event delivery', () => {
     const pending = await prisma.outboxEvent.count({ where: { publishedAt: null, type: 'PaymentSucceeded', aggregateId: { in: ours.map((payment) => payment.id) } } });
     expect(ours.length).toBeGreaterThan(0);
     expect(pending).toBe(0);
+  });
+});
+
+// Runs last: every journal entry written by the payments, refunds and deliveries above.
+describe('ledger after the whole run', () => {
+  it('balances every journal entry, in each currency, with at least two lines', async () => {
+    const unbalanced = await prisma.$queryRaw<{ entryId: string }[]>`
+      SELECT e.id AS "entryId"
+      FROM ledger.journal_entries e
+      LEFT JOIN ledger.journal_lines l ON l."entryId" = e.id
+      GROUP BY e.id
+      HAVING COUNT(l.id) < 2
+          OR EXISTS (
+            SELECT 1 FROM ledger.journal_lines x WHERE x."entryId" = e.id
+            GROUP BY x.currency
+            HAVING SUM(CASE WHEN x.side = 'debit' THEN x."amountMinor" ELSE -x."amountMinor" END) <> 0
+          )`;
+    expect(unbalanced).toEqual([]);
+    expect(await prisma.journalEntry.count()).toBeGreaterThan(5);
   });
 });

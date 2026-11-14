@@ -1,0 +1,113 @@
+# Staging (and a first single-host production) for Vendra: PostgreSQL, a one-off migration,
+# the API, the three portals, and Caddy in front with automatic HTTPS.
+#
+#   cp env.example .env   # then fill it in
+#   docker compose up -d --build
+#
+# The worker and Redis are left out on purpose: the worker has no jobs yet, and the API runs
+# its own timers (stock holds, event delivery, clean-up).
+name: vendra
+
+x-api: &api-image
+  build:
+    context: ../..
+    dockerfile: infrastructure/docker/backend.Dockerfile
+    args: { APP: api }
+  image: vendra-api:${VENDRA_VERSION:-latest}
+
+x-api-env: &api-env
+  NODE_ENV: production
+  PORT: "4000"
+  DATABASE_URL: postgresql://vendra:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/vendra
+  DIRECT_DATABASE_URL: postgresql://vendra:${POSTGRES_PASSWORD}@postgres:5432/vendra
+  JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+  SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY:?set SETTINGS_ENCRYPTION_KEY}
+  PORTAL_SHARED_SECRET: ${PORTAL_SHARED_SECRET:?set PORTAL_SHARED_SECRET}
+  # Caddy is the one proxy in front of the API (payment gateways call webhooks through it).
+  TRUST_PROXY_HOPS: "1"
+  CORS_ORIGINS: https://${STORE_DOMAIN},https://${ADMIN_DOMAIN},https://${SELLERS_DOMAIN}
+
+x-portal-env: &portal-env
+  # Portals call the API over the private network, never through the internet.
+  API_BASE_URL: http://api:4000
+  PORTAL_SHARED_SECRET: ${PORTAL_SHARED_SECRET}
+  PORTAL_TRUST_PROXY_HOPS: "1"
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vendra
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: vendra
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vendra -d vendra"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # No published port: only the API and the migration can reach it.
+
+  migrate:
+    <<: *api-image
+    environment: *api-env
+    command: ["sh", "-c", "cd apps/api && node_modules/.bin/prisma migrate deploy"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  api:
+    <<: *api-image
+    restart: unless-stopped
+    environment: *api-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/v1/health/ready >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  customer:
+    build: { context: ../.., dockerfile: infrastructure/docker/portal.Dockerfile, args: { APP: customer } }
+    image: vendra-customer:${VENDRA_VERSION:-latest}
+    restart: unless-stopped
+    environment: *portal-env
+    depends_on: { api: { condition: service_healthy } }
+
+  admin:
+    build: { context: ../.., dockerfile: infrastructure/docker/portal.Dockerfile, args: { APP: admin } }
+    image: vendra-admin:${VENDRA_VERSION:-latest}
+    restart: unless-stopped
+    environment: *portal-env
+    depends_on: { api: { condition: service_healthy } }
+
+  vendor:
+    build: { context: ../.., dockerfile: infrastructure/docker/portal.Dockerfile, args: { APP: vendor } }
+    image: vendra-vendor:${VENDRA_VERSION:-latest}
+    restart: unless-stopped
+    environment: *portal-env
+    depends_on: { api: { condition: service_healthy } }
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      STORE_DOMAIN: ${STORE_DOMAIN:?set STORE_DOMAIN}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN:?set ADMIN_DOMAIN}
+      SELLERS_DOMAIN: ${SELLERS_DOMAIN:?set SELLERS_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
+      ADMIN_ALLOWED_IPS: ${ADMIN_ALLOWED_IPS:-0.0.0.0/0 ::/0}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [customer, admin, vendor, api]
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

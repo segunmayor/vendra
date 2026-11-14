@@ -684,10 +684,13 @@ model JournalEntry {
   id         String        @id @default(uuid()) @db.Uuid
   sourceType String
   sourceId   String
+  /// The customer payment this entry concerns, when there is one.
+  paymentId  String?       @db.Uuid
   postedAt   DateTime      @db.Timestamptz
   lines      JournalLine[]
 
   @@unique([sourceType, sourceId])
+  @@index([paymentId])
   @@map("journal_entries")
   @@schema("ledger")
 }

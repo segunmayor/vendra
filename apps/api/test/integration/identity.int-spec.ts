@@ -153,6 +153,32 @@ describe('surfaces', () => {
     expect((await call('GET', 'health')).status).toBe(200);
   });
 
+  it('sends security headers and does not name the server software', async () => {
+    const response = await fetch(`${base}/v1/health`);
+    expect(Object.fromEntries(['x-content-type-options', 'x-frame-options', 'referrer-policy', 'content-security-policy', 'cache-control', 'x-powered-by'].map((name) => [name, response.headers.get(name)]))).toEqual({
+      'x-content-type-options': 'nosniff',
+      'x-frame-options': 'DENY',
+      'referrer-policy': 'no-referrer',
+      'content-security-policy': "default-src 'none'; frame-ancestors 'none'",
+      'cache-control': 'no-store',
+      'x-powered-by': null,
+    });
+  });
+
+  it('limits how many accounts one address can create in an hour', async () => {
+    expect((await register('vendor')).status).toBe(201);
+    const latest = await prisma.loginFailure.findFirst({ where: { key: { startsWith: 'ip:register:' } }, orderBy: { occurredAt: 'desc' } });
+    const key = latest!.key;
+    try {
+      // Fill the hour's allowance (default 100) as if this address had already signed up that often.
+      await prisma.loginFailure.createMany({ data: Array.from({ length: 100 }, () => ({ key, occurredAt: new Date() })) });
+      expect(await register('store')).toMatchObject({ status: 429, body: { code: 'auth.too_many_registrations' } });
+    } finally {
+      await prisma.loginFailure.deleteMany({ where: { key } });
+    }
+    expect((await register('store')).status).toBe(201);
+  });
+
   it('has no public staff registration', async () => {
     const reply = await call('POST', 'admin/auth/register', { body: { email: email(), password: PASSWORD } });
     expect(reply.status).toBe(404);

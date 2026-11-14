@@ -22,6 +22,8 @@ export type CaseStatus = 'submitted' | 'approved' | 'rejected' | 'changes_reques
 /** Safety caps, not business choices: they bound storage per application. */
 export const MAX_DOCUMENTS = 12;
 export const MAX_PER_KIND = 3;
+/** Everything kept for one application, including files from earlier submissions. */
+export const MAX_STORED_BYTES = 50 * 1024 * 1024;
 
 export interface BusinessAddress {
   readonly line1: string;
@@ -144,6 +146,7 @@ export function parseProfile(input: ProfileInput): BusinessProfile {
 
 export class SellerApplication extends AggregateRoot {
   private state: SellerApplicationState;
+  private discarded: string[] = [];
 
   private constructor(state: SellerApplicationState) {
     super();
@@ -195,6 +198,10 @@ export class SellerApplication extends AggregateRoot {
   get allDocuments(): readonly SellerDocument[] {
     return this.state.documents;
   }
+  /** Removed files that were never sent for review: the repository deletes them for good. */
+  get discardedDocumentIds(): readonly string[] {
+    return this.discarded;
+  }
   get editable(): boolean {
     return this.state.status === 'draft' || this.state.status === 'changes_requested';
   }
@@ -214,15 +221,24 @@ export class SellerApplication extends AggregateRoot {
     if (current.filter((existing) => existing.kind === document.kind).length >= MAX_PER_KIND) {
       throw new DomainError('seller.too_many_documents', `You can attach up to ${MAX_PER_KIND} files for "${DOCUMENT_LABEL[document.kind]}". Remove one first.`);
     }
+    const stored = this.state.documents.reduce((sum, existing) => sum + existing.sizeBytes, 0);
+    if (stored + document.sizeBytes > MAX_STORED_BYTES) {
+      throw new DomainError('seller.storage_full', 'Your documents are larger than we can keep for one application. Remove a large file, or send smaller copies.');
+    }
     this.state = { ...this.state, documents: [...this.state.documents, { ...document, removedAt: null }] };
   }
 
   removeDocument(documentId: string, now: Date): void {
     this.assertEditable();
     if (!this.documents.some((document) => document.id === documentId)) throw new DomainError('seller.document_not_found', 'That document is not attached');
+    // A file staff have seen stays with that submission. One never sent is deleted.
+    const submitted = this.state.cases.some((entry) => entry.documentIds.includes(documentId));
+    if (!submitted) this.discarded.push(documentId);
     this.state = {
       ...this.state,
-      documents: this.state.documents.map((document) => (document.id === documentId ? { ...document, removedAt: now } : document)),
+      documents: submitted
+        ? this.state.documents.map((document) => (document.id === documentId ? { ...document, removedAt: now } : document))
+        : this.state.documents.filter((document) => document.id !== documentId),
     };
   }
 
@@ -278,6 +294,7 @@ export class SellerApplication extends AggregateRoot {
   /** Called by the repository after a successful save. */
   markSaved(): void {
     this.state = { ...this.state, version: this.state.version + 1 };
+    this.discarded = [];
   }
 
   private assertEditable(): void {

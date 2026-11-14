@@ -84,6 +84,7 @@ describe('SellerApplication', () => {
       ['c2', 'submitted', ['d2']],
     ]);
     expect(application.allDocuments.find((entry) => entry.id === 'd1')?.removedAt).toEqual(now);
+    expect(application.discardedDocumentIds).toEqual([]);
     expect(application.documents.map((entry) => entry.id)).toEqual(['d2']);
   });
 
@@ -102,6 +103,18 @@ describe('SellerApplication', () => {
     rejected.review('reject', 'staff1', 'The CAC number belongs to another business', now);
     expect(rejected.status).toBe('rejected');
     expect(rejected.latestCase).toMatchObject({ status: 'rejected', reviewedBy: 'staff1', notes: 'The CAC number belongs to another business' });
+  });
+
+  it('deletes a removed file that was never sent, and caps what one application stores', () => {
+    const application = started();
+    application.addDocument(doc('a', 'other'));
+    application.removeDocument('a', now);
+    expect(application.allDocuments).toEqual([]);
+    expect(application.discardedDocumentIds).toEqual(['a']);
+    application.markSaved();
+    expect(application.discardedDocumentIds).toEqual([]);
+    application.addDocument({ ...doc('big', 'other'), sizeBytes: 40 * 1024 * 1024 });
+    expect(() => application.addDocument({ ...doc('more', 'other'), sizeBytes: 11 * 1024 * 1024 })).toThrow('larger than we can keep');
   });
 
   it('caps documents per kind', () => {

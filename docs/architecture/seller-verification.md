@@ -30,7 +30,9 @@ Each sending creates a verification case holding a snapshot of the details and t
 
 - The type is judged by the file's first bytes, not its name or the type the browser claimed. The stored name always ends in the real extension.
 - Size limit: the "Largest document file" setting (default 5 MB), and never more than 10 MB. Larger requests are refused before they are read in full (HTTP 413).
-- Up to 3 files of each kind and 12 in total per application.
+- Up to 3 files of each kind and 12 in total per application, and at most 50 MB stored for one application, counting files kept from earlier submissions.
+- A file removed before it was ever sent for review is deleted outright. A file staff have seen stays with its submission.
+- New accounts are limited per IP address each hour (Settings, Sign-in and security), so applications cannot be scripted at scale.
 - Files are stored in PostgreSQL (`sellers.seller_documents`, with a SHA-256 of each) because volumes are small at launch and no file store has been chosen. Moving them to object storage changes only the repository.
 - Files are only ever sent as downloads (`Content-Disposition: attachment`, `nosniff`, a sandboxing CSP), through the portal's own route, so an uploaded file can never run as a page. Applicants can open only their own files; staff need `vendors.approve`.
 

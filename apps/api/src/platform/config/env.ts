@@ -27,6 +27,22 @@ const schema = z.object({
     .transform((value) => value.split(',').map((origin) => origin.trim()).filter(Boolean)),
 });
 
+/**
+ * In production these are not optional: without the encryption key staff cannot save gateway
+ * keys or use two-step sign-in, without the portal secret every visitor appears to come from
+ * the portal server (so per-address limits would block everyone), and without CORS origins
+ * the setting is meaningless.
+ */
+const production = schema.superRefine((env, context) => {
+  if (env.NODE_ENV !== 'production') return;
+  for (const key of ['SETTINGS_ENCRYPTION_KEY', 'PORTAL_SHARED_SECRET'] as const) {
+    if (!env[key]) context.addIssue({ code: 'custom', path: [key], message: 'required in production' });
+  }
+  if (env.CORS_ORIGINS.some((origin) => !origin.startsWith('https://'))) {
+    context.addIssue({ code: 'custom', path: ['CORS_ORIGINS'], message: 'must be https:// origins in production' });
+  }
+});
+
 export type Env = z.infer<typeof schema>;
 
 /** Injection token for the validated environment. */
@@ -34,7 +50,7 @@ export const ENV = Symbol('ENV');
 
 /** Fails at startup, naming the bad variables but never their values. */
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
-  const parsed = schema.safeParse(source);
+  const parsed = production.safeParse(source);
   if (!parsed.success) {
     const names = parsed.error.issues.map((issue) => issue.path.join('.')).join(', ');
     throw new Error(`Invalid environment configuration: ${names}`);

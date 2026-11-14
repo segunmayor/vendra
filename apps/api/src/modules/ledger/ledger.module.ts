@@ -25,15 +25,15 @@ class LedgerReactions implements OnModuleInit {
     this.registry.on('PaymentRefunded', async (event) => {
       const { refundId, amountMinor, currency } = event.payload;
       if (typeof refundId !== 'string' || typeof amountMinor !== 'string' || typeof currency !== 'string') throw new Error(`PaymentRefunded ${event.id} is incomplete`);
-      await this.postRefund.execute(refundId, Money.of(BigInt(amountMinor), currency), new Date(event.occurredAt));
+      await this.postRefund.execute(refundId, event.aggregateId, Money.of(BigInt(amountMinor), currency), new Date(event.occurredAt));
     });
     this.registry.on('OrderFulfilled', async (event) => {
-      const { orderId, subtotalMinor, deliveryMinor, currency } = event.payload;
-      if (typeof orderId !== 'string' || typeof subtotalMinor !== 'string' || typeof deliveryMinor !== 'string' || typeof currency !== 'string') {
+      const { orderId, paymentId, subtotalMinor, deliveryMinor, currency } = event.payload;
+      if (typeof orderId !== 'string' || typeof paymentId !== 'string' || typeof subtotalMinor !== 'string' || typeof deliveryMinor !== 'string' || typeof currency !== 'string') {
         throw new Error(`OrderFulfilled ${event.id} is incomplete`);
       }
       const amounts = { subtotal: Money.of(BigInt(subtotalMinor), currency), delivery: Money.of(BigInt(deliveryMinor), currency) };
-      await this.postDelivered.execute(orderId, amounts, new Date(event.occurredAt));
+      await this.postDelivered.execute(orderId, paymentId, amounts, new Date(event.occurredAt));
     });
   }
 }

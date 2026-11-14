@@ -158,13 +158,16 @@ function createRegistrationController(audience: Exclude<Audience, 'admin'>) {
   @Public()
   @Controller({ path: `${audience}/auth`, version: '1' })
   class RegistrationController {
-    constructor(readonly auth: AuthService) {}
+    constructor(
+      readonly auth: AuthService,
+      @Inject(ENV) readonly env: Env,
+    ) {}
 
     @Post('register')
     @ApiOperation({ operationId: `${audience}Register` })
     @ApiCreatedResponse({ type: SessionResponse })
-    register(@Body(new ZodPipe(credentialsSchema)) body: CredentialsDto): Promise<IssuedSession> {
-      return this.auth.register(audience, body.email, body.password);
+    register(@Body(new ZodPipe(credentialsSchema)) body: CredentialsDto, @Req() request: Request): Promise<IssuedSession> {
+      return this.auth.register(audience, body.email, body.password, clientIp(request, this.env.PORTAL_SHARED_SECRET));
     }
   }
   return RegistrationController;

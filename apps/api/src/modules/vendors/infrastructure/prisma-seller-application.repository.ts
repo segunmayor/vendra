@@ -105,6 +105,9 @@ export class PrismaSellerApplicationRepository implements SellerApplicationRepos
           },
         });
       }
+      if (application.discardedDocumentIds.length > 0) {
+        await tx.sellerDocument.deleteMany({ where: { sellerId: application.id, id: { in: [...application.discardedDocumentIds] } } });
+      }
       for (const document of application.allDocuments) {
         if (document.removedAt) await tx.sellerDocument.updateMany({ where: { id: document.id, removedAt: null }, data: { removedAt: document.removedAt } });
       }
