@@ -815,13 +815,30 @@ describe('cancellation', () => {
     expect(await stockOf(listingId)).toEqual({ onHand: 5, reserved: 0 });
     expect((await cancel(order.id)).status).toBe(422);
 
-    // The refund comes out of prepayments, since no sale was recognised.
+    // Owed a refund until the gateway confirms refunds covering what was paid.
+    const owed = async () => ok(await call('GET', 'admin/orders?owedRefund=true', { token: clerk })).some((entry: { id: string }) => entry.id === order.id);
+    expect(after).toMatchObject({ owedRefund: true, refunded: { amountMinor: '0' } });
+    expect(await owed()).toBe(true);
+    const owedBefore = ok(await call('GET', 'admin/orders/counts', { token: clerk })).owedRefund;
+    expect(owedBefore).toBeGreaterThanOrEqual(1);
+
+    // The refund comes out of prepayments, since no sale was recognised. Two parts: still owed after the first.
     const refunder = await staffToken(['payments.read', 'orders.refund']);
     const { paymentId } = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
-    const sent = ok(await call('POST', `admin/payments/${paymentId}/refunds`, { token: refunder, body: { amountMinor: '2750000', reason: 'Order cancelled' } }), 201);
-    fake.refunds.set(Number(sent.providerRefundId), 'processed');
-    expect(ok(await call('POST', `admin/refunds/${sent.id}/check`, { token: refunder })).status).toBe('succeeded');
+    for (const [amountMinor, stillOwed] of [['250000', true], ['2500000', false]] as const) {
+      const sent = ok(await call('POST', `admin/payments/${paymentId}/refunds`, { token: refunder, body: { amountMinor, reason: 'Order cancelled' } }), 201);
+      fake.refunds.set(Number(sent.providerRefundId), 'processed');
+      expect(ok(await call('POST', `admin/refunds/${sent.id}/check`, { token: refunder })).status).toBe('succeeded');
+      await app.get(OutboxRunner).drain();
+      expect(ok(await call('GET', `admin/orders/${order.id}`, { token: clerk })).owedRefund).toBe(stillOwed);
+    }
+    expect(ok(await call('GET', `admin/orders/${order.id}`, { token: clerk })).refunded).toEqual({ amountMinor: '2750000', currency: 'NGN' });
+    expect(await owed()).toBe(false);
+    expect(ok(await call('GET', 'admin/orders/counts', { token: clerk })).owedRefund).toBe(owedBefore - 1);
+    // A repeated event records nothing twice.
+    await prisma.outboxEvent.updateMany({ where: { type: 'PaymentRefunded', aggregateId: paymentId }, data: { publishedAt: null, attempts: 0 } });
     await app.get(OutboxRunner).drain();
+    expect(await prisma.orderRefund.count({ where: { orderId: order.id } })).toBe(2);
     const net = await prisma.$queryRaw<{ accountCode: string; balance: bigint }[]>`
       SELECT l."accountCode", SUM(CASE WHEN l.side = 'credit' THEN l."amountMinor" ELSE -l."amountMinor" END)::bigint AS balance
       FROM ledger.journal_lines l JOIN ledger.journal_entries e ON e.id = l."entryId"

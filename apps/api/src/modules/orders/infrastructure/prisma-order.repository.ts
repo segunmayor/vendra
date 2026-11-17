@@ -6,6 +6,12 @@ import { OrderFilter, OrderRepository } from '../application/orders.service';
 
 /** Paid, with items still waiting to be handed to a courier. */
 const TO_SEND = { status: 'placed', sellerOrders: { some: { status: 'pending' } } } satisfies Prisma.OrderWhereInput;
+
+/** Cancelled or stock issue orders whose completed refunds do not yet cover what was paid. */
+const OWED_REFUND = Prisma.sql`
+  SELECT o."id" FROM "orders"."orders" o
+  LEFT JOIN (SELECT "orderId", SUM("amountMinor") AS refunded FROM "orders"."order_refunds" GROUP BY 1) r ON r."orderId" = o."id"
+  WHERE o."status" IN ('cancelled', 'stock_issue') AND COALESCE(r.refunded, 0) < o."totalMinor"`;
 import { Order, OrderAddress, OrderStatus, SellerOrderStatus } from '../domain/order';
 
 const include = { sellerOrders: { include: { lines: { orderBy: { position: 'asc' } } }, orderBy: { position: 'asc' } } } as const;
@@ -162,8 +168,10 @@ export class PrismaOrderRepository implements OrderRepository {
   }
 
   async listRecent(limit: number, filter: OrderFilter): Promise<Order[]> {
+    const owed = filter.owedRefund ? (await this.prisma.$queryRaw<{ id: string }[]>(OWED_REFUND)).map((row) => row.id) : null;
     const rows = await this.prisma.order.findMany({
       where: {
+        ...(owed ? { id: { in: owed } } : {}),
         ...(filter.status ? { status: filter.status } : {}),
         ...(filter.number ? { number: filter.number } : {}),
         ...(filter.toSend ? TO_SEND : {}),
@@ -182,5 +190,25 @@ export class PrismaOrderRepository implements OrderRepository {
 
   countToSend(): Promise<number> {
     return this.prisma.order.count({ where: TO_SEND });
+  }
+
+  async countOwedRefund(): Promise<number> {
+    const [row] = await this.prisma.$queryRaw<{ n: bigint }[]>`SELECT COUNT(*) AS n FROM (${OWED_REFUND}) owed`;
+    return Number(row?.n ?? 0n);
+  }
+
+  async recordRefund(paymentId: string, refundId: string, amountMinor: bigint, at: Date): Promise<boolean> {
+    const order = await this.prisma.order.findFirst({ where: { paymentId }, select: { id: true } });
+    if (!order) return false;
+    const inserted = await this.prisma.$executeRaw`
+      INSERT INTO "orders"."order_refunds" ("refundId", "orderId", "amountMinor", "refundedAt")
+      VALUES (${refundId}::uuid, ${order.id}::uuid, ${amountMinor}, ${at})
+      ON CONFLICT ("refundId") DO NOTHING`;
+    return inserted === 1;
+  }
+
+  async refundedMinor(orderId: string): Promise<bigint> {
+    const total = await this.prisma.orderRefund.aggregate({ where: { orderId }, _sum: { amountMinor: true } });
+    return total._sum.amountMinor ?? 0n;
   }
 }

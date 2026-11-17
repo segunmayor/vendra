@@ -44,14 +44,14 @@ Use a real card and a small real amount, then refund it.
 - [ ] The ledger shows the payment in prepayments, then moved to sales and delivery charges.
 - [ ] Refund the rehearsal order in full from Admin (this needs two-step sign-in). Paystack confirms the refund, and the ledger debits "Refunds after delivery" (4900), since the sale was already recorded.
 - [ ] Seller: apply with test documents; staff ask for changes, then reject. Remove the test application's account afterwards if wanted.
-- [ ] Place a second small order, hand it to a courier, then cancel it before collection. The stock goes back, the shipment shows cancelled, and the order page shows the amount still to refund. Refund it: the ledger debits prepayments (2100), not 4900.
+- [ ] Place a second small order, hand it to a courier, then cancel it before collection. The stock goes back, the shipment shows cancelled, and the order page shows the amount still to refund. Refund it: the ledger debits prepayments (2100), not 4900, and the order leaves Dashboard → Orders owed a refund.
 - [ ] Staff without a permission cannot open that page. A signed-out visitor to Admin is sent to sign in.
 
 ## Launch day watch list
 
 There is no monitoring service yet (Sentry and alerts are planned), so check these by hand at least twice a day in the first week:
 
-- [ ] Dashboard: payments to review, orders with a stock issue, failed deliveries, orders to send, seller applications to review.
+- [ ] Dashboard: payments to review, orders owed a refund, failed deliveries, orders to send, seller applications to review.
 - [ ] `docker compose logs api | grep -i error` shows nothing new.
 - [ ] Disk space on the host (`df -h`): the database and seller documents grow here.
 - [ ] Payments page: no payments stuck as "initiated" from more than an hour ago.

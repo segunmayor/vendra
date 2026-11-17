@@ -12,6 +12,7 @@ const listSchema = z.object({
   status: z.enum(STATUSES).optional(),
   number: z.string().trim().regex(/^\d{1,12}$/).optional(),
   toSend: z.enum(['true']).transform(() => true).optional(),
+  owedRefund: z.enum(['true']).transform(() => true).optional(),
 });
 const cancelSchema = z.object({
   reason: z.string().trim().min(3).max(CANCEL_REASON_MAX),
@@ -90,11 +91,14 @@ export class AdminOrderResponse extends OrderResponse {
   @ApiProperty() version!: number;
   @ApiPropertyOptional({ type: CancellationDto, nullable: true }) cancellation!: CancellationDto | null;
   @ApiPropertyOptional({ type: String, nullable: true, description: 'Why staff cannot cancel it now; null when they can' }) cannotCancelBecause!: string | null;
+  @ApiProperty({ type: MoneyDto, description: 'Refunds the gateway has confirmed' }) refunded!: MoneyDto;
+  @ApiProperty({ description: 'Cancelled or stock issue, and not yet refunded in full' }) owedRefund!: boolean;
 }
 
 export class OrderCountsResponse {
   @ApiProperty({ type: 'object', additionalProperties: { type: 'number' }, description: 'Orders in each status' }) byStatus!: Record<string, number>;
   @ApiProperty({ description: 'Paid orders with items not yet handed to a courier' }) toSend!: number;
+  @ApiProperty({ description: 'Cancelled or stock issue orders not yet refunded in full' }) owedRefund!: number;
 }
 
 const money = (value: Money): MoneyDto => ({ amountMinor: value.minor.toString(), currency: value.currency });
@@ -142,8 +146,9 @@ function detail(order: Order): OrderResponse {
   };
 }
 
-function adminDetail(order: Order, customerEmail: string | null): AdminOrderResponse {
+function adminDetail({ order, customerEmail, refunded }: { order: Order; customerEmail: string | null; refunded: Money }): AdminOrderResponse {
   const state = order.snapshot;
+  const owesRefund = state.status === 'cancelled' || state.status === 'stock_issue';
   return {
     ...detail(order),
     paymentId: state.paymentId,
@@ -153,6 +158,8 @@ function adminDetail(order: Order, customerEmail: string | null): AdminOrderResp
     version: state.version,
     cancellation: state.cancellation ? { ...state.cancellation } : null,
     cannotCancelBecause: order.cannotCancelBecause,
+    refunded: money(refunded),
+    owedRefund: owesRefund && refunded.minor < state.total.minor,
   };
 }
 
@@ -198,6 +205,7 @@ export class AdminOrdersController {
   @ApiQuery({ name: 'status', required: false, enum: STATUSES })
   @ApiQuery({ name: 'number', required: false, type: String })
   @ApiQuery({ name: 'toSend', required: false, enum: ['true'], description: 'Only orders with items waiting to be sent' })
+  @ApiQuery({ name: 'owedRefund', required: false, enum: ['true'], description: 'Only cancelled or stock issue orders not yet refunded in full' })
   @ApiOkResponse({ type: [OrderSummaryResponse] })
   async list(@Query(new ZodPipe(listSchema)) query: z.infer<typeof listSchema>): Promise<OrderSummaryResponse[]> {
     return (await this.orders.list(query)).map(summary);
@@ -214,8 +222,7 @@ export class AdminOrdersController {
   @ApiOperation({ operationId: 'adminGetOrder' })
   @ApiOkResponse({ type: AdminOrderResponse })
   async get(@Param('id', uuid) id: string): Promise<AdminOrderResponse> {
-    const { order, customerEmail } = await this.orders.get(id);
-    return adminDetail(order, customerEmail);
+    return adminDetail(await this.orders.get(id));
   }
 
   @Post(':id/cancel')
@@ -228,7 +235,6 @@ export class AdminOrdersController {
     @Body(new ZodPipe(cancelSchema)) body: CancelOrderRequest,
   ): Promise<AdminOrderResponse> {
     await this.orders.cancel(principal, id, body.reason, body.version);
-    const { order, customerEmail } = await this.orders.get(id);
-    return adminDetail(order, customerEmail);
+    return adminDetail(await this.orders.get(id));
   }
 }

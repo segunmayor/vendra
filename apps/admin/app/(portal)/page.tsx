@@ -35,7 +35,7 @@ export default async function DashboardPage() {
               <Tile href="/shipments?status=delivery_failed" count={failed.length} label="Failed deliveries" note="Call the customer, then try again or bring the parcel back." urgent />
             ) : null}
             {counts ? (
-              <Tile href="/orders?status=stock_issue" count={counts.byStatus.stock_issue ?? 0} label="Orders with a stock issue" note="Paid, but an item sold out. Refund and call the customer." urgent />
+              <Tile href="/orders?owedRefund=true" count={counts.owedRefund} label="Orders owed a refund" note="Cancelled, or an item sold out, and not yet refunded in full." urgent />
             ) : null}
             {review ? (
               <Tile href="/payments?status=requires_review" count={review.length} label="Payments to review" note="The gateway reported a different amount. No order was placed." urgent />

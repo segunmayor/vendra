@@ -44,6 +44,11 @@ class OrderReactions implements OnModuleInit {
       if (typeof checkoutId !== 'string') throw new Error(`CheckoutPaid ${event.id} has no checkout`);
       await this.orders.placeFromCheckout(checkoutId);
     });
+    this.registry.on('PaymentRefunded', async (event) => {
+      const { refundId, amountMinor } = event.payload;
+      if (typeof refundId !== 'string' || typeof amountMinor !== 'string') throw new Error(`PaymentRefunded ${event.id} is incomplete`);
+      await this.orders.recordRefund(event.aggregateId, refundId, BigInt(amountMinor));
+    });
     this.registry.on('ShipmentStatusChanged', async (event) => {
       const { sellerOrderId, status } = event.payload;
       if (typeof sellerOrderId !== 'string' || typeof status !== 'string') throw new Error(`ShipmentStatusChanged ${event.id} is incomplete`);

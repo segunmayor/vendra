@@ -517,10 +517,25 @@ model Order {
   createdAt       DateTime      @default(now()) @db.Timestamptz
   updatedAt       DateTime      @updatedAt @db.Timestamptz
   sellerOrders    SellerOrder[]
+  refunds         OrderRefund[]
 
   @@index([customerId, createdAt])
   @@index([status, placedAt])
+  @@index([paymentId])
   @@map("orders")
+  @@schema("orders")
+}
+
+/// A completed refund of the order's payment, recorded from PaymentRefunded.
+model OrderRefund {
+  refundId    String   @id @db.Uuid
+  orderId     String   @db.Uuid
+  amountMinor BigInt
+  refundedAt  DateTime @db.Timestamptz
+  order       Order    @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@map("order_refunds")
   @@schema("orders")
 }
 

@@ -3147,6 +3147,18 @@
         "operationId": "adminListOrders",
         "parameters": [
           {
+            "name": "owedRefund",
+            "required": false,
+            "in": "query",
+            "description": "Only cancelled or stock issue orders not yet refunded in full",
+            "schema": {
+              "enum": [
+                "true"
+              ],
+              "type": "string"
+            }
+          },
+          {
             "name": "toSend",
             "required": false,
             "in": "query",
@@ -6719,11 +6731,16 @@
           "toSend": {
             "type": "number",
             "description": "Paid orders with items not yet handed to a courier"
+          },
+          "owedRefund": {
+            "type": "number",
+            "description": "Cancelled or stock issue orders not yet refunded in full"
           }
         },
         "required": [
           "byStatus",
-          "toSend"
+          "toSend",
+          "owedRefund"
         ]
       },
       "CancellationDto": {
@@ -6842,6 +6859,18 @@
             "type": "string",
             "nullable": true,
             "description": "Why staff cannot cancel it now; null when they can"
+          },
+          "refunded": {
+            "description": "Refunds the gateway has confirmed",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MoneyDto"
+              }
+            ]
+          },
+          "owedRefund": {
+            "type": "boolean",
+            "description": "Cancelled or stock issue, and not yet refunded in full"
           }
         },
         "required": [
@@ -6863,7 +6892,9 @@
           "paymentId",
           "checkoutId",
           "customerId",
-          "version"
+          "version",
+          "refunded",
+          "owedRefund"
         ]
       },
       "CancelOrderRequest": {

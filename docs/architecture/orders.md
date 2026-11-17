@@ -24,7 +24,7 @@ Safeguards:
 
 - **Customers** see only their own orders, under **My account**: the list, each order, and a link from the "payment confirmed" page.
 - **Staff with `orders.manage`** see **Admin → Orders**: filter by status, find by number, and open an order. The order page shows the items, totals, address, customer email, and a link to the payment for refunds (with `payments.read`).
-- **Dashboard → Needs attention** counts orders to send, orders with a stock issue, and payments to review. Each count links to its list.
+- **Dashboard → Needs attention** counts orders to send, orders owed a refund, and payments to review. Each count links to its list.
 
 ## Statuses
 
@@ -56,7 +56,18 @@ Staff with `orders.manage` cancel from the order page, giving a reason. It is al
 3. **Shipping** reacts: a shipment still waiting for collection is cancelled. Marking a shipment collected is refused once its order is cancelled, which closes the gap before the reaction runs.
 4. The API delivers these events before answering, so the page staff return to already shows the stock back.
 
-Cancelling does **not** move money. Refunds need `orders.refund` and two-step sign-in, which not everyone who manages orders has. The order page shows how much of the payment has not been refunded, with a link to the payment page. The refund then posts against prepayments in the ledger, since no sale was recognised.
+Cancelling does **not** move money. Refunds need `orders.refund` and two-step sign-in, which not everyone who manages orders has. The refund then posts against prepayments in the ledger, since no sale was recognised.
+
+## Orders owed a refund
+
+Orders keeps its own record of completed refunds (`orders.order_refunds`), written from `PaymentRefunded` and keyed by refund id, so a repeated event records nothing twice. Orders never reads the payments tables. Migration 0016 backfilled refunds completed before it.
+
+A `cancelled` or `stock_issue` order is **owed a refund** while its recorded refunds are less than what was paid. Staff see:
+- **Dashboard → Orders owed a refund**, which replaces the stock issue tile and covers both cases;
+- an **Owed a refund** filter on the orders list;
+- on the order page, how much is still to refund (with a link to the payment for staff with `payments.read`), or "Refunded in full".
+
+Refunds still in progress at the gateway do not count until it confirms them.
 
 Customers see "Cancelled" and a note that they will be refunded. The staff reason is not shown to them. Customers cannot cancel orders themselves at launch.
 

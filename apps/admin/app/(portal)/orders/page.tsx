@@ -10,16 +10,18 @@ export const metadata: Metadata = { title: 'Orders' };
 const FILTERS = [
   { key: 'all', label: 'All', href: '/orders' },
   { key: 'toSend', label: 'To send', href: '/orders?toSend=true' },
+  { key: 'owedRefund', label: 'Owed a refund', href: '/orders?owedRefund=true' },
   ...ORDER_STATUSES.map((status) => ({ key: status, label: ORDER_LABEL[status], href: `/orders?status=${status}` })),
 ];
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ status?: string; number?: string; toSend?: string }> }) {
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ status?: string; number?: string; toSend?: string; owedRefund?: string }> }) {
   const params = await searchParams;
   const status = ORDER_STATUSES.includes(params.status as OrderStatus) ? (params.status as OrderStatus) : undefined;
   const number = params.number && /^\d{1,12}$/.test(params.number.trim()) ? params.number.trim() : undefined;
   const toSend = params.toSend === 'true' && !status ? ('true' as const) : undefined;
-  const current = number ? null : toSend ? 'toSend' : (status ?? 'all');
-  const orders = await session.read((api) => api.GET('/v1/admin/orders', { params: { query: { status, number, toSend } } }));
+  const owedRefund = params.owedRefund === 'true' && !status && !toSend ? ('true' as const) : undefined;
+  const current = number ? null : toSend ? 'toSend' : owedRefund ? 'owedRefund' : (status ?? 'all');
+  const orders = await session.read((api) => api.GET('/v1/admin/orders', { params: { query: { status, number, toSend, owedRefund } } }));
 
   return (
     <>

@@ -2270,6 +2270,8 @@ export interface components {
             };
             /** @description Paid orders with items not yet handed to a courier */
             toSend: number;
+            /** @description Cancelled or stock issue orders not yet refunded in full */
+            owedRefund: number;
         };
         CancellationDto: {
             reason: string;
@@ -2309,6 +2311,10 @@ export interface components {
             cancellation?: components["schemas"]["CancellationDto"] | null;
             /** @description Why staff cannot cancel it now; null when they can */
             cannotCancelBecause?: string | null;
+            /** @description Refunds the gateway has confirmed */
+            refunded: components["schemas"]["MoneyDto"];
+            /** @description Cancelled or stock issue, and not yet refunded in full */
+            owedRefund: boolean;
         };
         CancelOrderRequest: {
             /** @description Why, for the audit log and other staff */
@@ -4511,6 +4517,8 @@ export interface operations {
     adminListOrders: {
         parameters: {
             query?: {
+                /** @description Only cancelled or stock issue orders not yet refunded in full */
+                owedRefund?: "true";
                 /** @description Only orders with items waiting to be sent */
                 toSend?: "true";
                 number?: string;

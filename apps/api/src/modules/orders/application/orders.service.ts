@@ -1,4 +1,4 @@
-import { ApplicationError, AuditEntry, ConcurrencyConflict, Principal } from '../../../shared-kernel';
+import { ApplicationError, AuditEntry, ConcurrencyConflict, Money, Principal } from '../../../shared-kernel';
 import { CheckoutService, PaidCheckout } from '../../checkout';
 import { ListingQueries } from '../../listings';
 import { Order, OrderAddress, OrderStatus, SellerOrderStatus, ShipmentProgress } from '../domain/order';
@@ -19,6 +19,12 @@ export interface OrderRepository {
   countByStatus(): Promise<Record<string, number>>;
   /** Paid orders with items not yet handed to a courier. */
   countToSend(): Promise<number>;
+  /** Cancelled or stock issue orders not yet refunded in full. */
+  countOwedRefund(): Promise<number>;
+  /** Records a completed refund of the order's payment. False if already recorded, or no order has that payment. */
+  recordRefund(paymentId: string, refundId: string, amountMinor: bigint, at: Date): Promise<boolean>;
+  /** Completed refunds recorded for the order. */
+  refundedMinor(orderId: string): Promise<bigint>;
 }
 
 export interface OrderFilter {
@@ -26,6 +32,8 @@ export interface OrderFilter {
   readonly number?: string;
   /** Only paid orders with items not yet handed to a courier. */
   readonly toSend?: boolean;
+  /** Only cancelled or stock issue orders not yet refunded in full. */
+  readonly owedRefund?: boolean;
 }
 
 export interface CustomerDirectory {
@@ -106,10 +114,16 @@ export class OrderService {
     return this.orders.listRecent(100, filter);
   }
 
-  async get(id: string): Promise<{ order: Order; customerEmail: string | null }> {
+  async get(id: string): Promise<{ order: Order; customerEmail: string | null; refunded: Money }> {
     const order = await this.orders.findById(id);
     if (!order) throw notFound();
-    return { order, customerEmail: await this.customers.emailOf(order.snapshot.customerId) };
+    const [customerEmail, refundedMinor] = await Promise.all([this.customers.emailOf(order.snapshot.customerId), this.orders.refundedMinor(id)]);
+    return { order, customerEmail, refunded: Money.of(refundedMinor, order.snapshot.total.currency) };
+  }
+
+  /** From payments, once a refund is confirmed. Safe to repeat. */
+  async recordRefund(paymentId: string, refundId: string, amountMinor: bigint): Promise<void> {
+    await this.orders.recordRefund(paymentId, refundId, amountMinor, this.clock.now());
   }
 
   /** For shipping: what one seller must send, and where. */
@@ -188,9 +202,9 @@ export class OrderService {
   }
 
   /** How many orders are in each status, for the staff dashboard. */
-  async counts(): Promise<{ byStatus: Record<string, number>; toSend: number }> {
-    const [byStatus, toSend] = await Promise.all([this.orders.countByStatus(), this.orders.countToSend()]);
-    return { byStatus, toSend };
+  async counts(): Promise<{ byStatus: Record<string, number>; toSend: number; owedRefund: number }> {
+    const [byStatus, toSend, owedRefund] = await Promise.all([this.orders.countByStatus(), this.orders.countToSend(), this.orders.countOwedRefund()]);
+    return { byStatus, toSend, owedRefund };
   }
 
   private async linesWithSellers(checkout: PaidCheckout) {

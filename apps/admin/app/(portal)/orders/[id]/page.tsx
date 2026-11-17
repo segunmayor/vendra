@@ -19,9 +19,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     can('shipments.manage'),
     session.read((api) => api.GET('/v1/admin/orders/{id}/shipments', { params: { path: { id } } })),
   ]);
-  // Cancelled and stock issue orders are owed a refund: show how much is still to go back.
-  const owed = order.status === 'cancelled' || order.status === 'stock_issue';
-  const payment = owed && seePayment ? await session.find((api) => api.GET('/v1/admin/payments/{id}', { params: { path: { id: order.paymentId } } })) : null;
+  // Cancelled and stock issue orders are owed what was paid, less refunds the gateway confirmed.
+  const owes = order.status === 'cancelled' || order.status === 'stock_issue';
+  const stillOwed = BigInt(order.total.amountMinor) - BigInt(order.refunded.amountMinor);
   const badge = orderBadge(order);
   const money = (value: { amountMinor: string; currency: string }) => formatMoney(value.amountMinor, value.currency);
   const options = (values: Record<string, string>) => Object.entries(values).map(([key, value]) => `${key}: ${value}`).join(', ');
@@ -45,18 +45,22 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           </Alert>
         </div>
       ) : null}
-      {payment && ['succeeded', 'partially_refunded', 'refunded'].includes(payment.status) ? (
+      {owes ? (
         <div className="mb-6">
-          {BigInt(payment.refundableMinor) > 0n ? (
+          {order.owedRefund ? (
             <Alert>
-              {formatMoney(payment.refundableMinor, payment.currency)} of the payment has not been refunded.{' '}
-              <Link href={`/payments/${order.paymentId}`} className="font-semibold underline underline-offset-2">
-                Refund the customer
-              </Link>
-              {BigInt(payment.refundPendingMinor) > 0n ? ` (${formatMoney(payment.refundPendingMinor, payment.currency)} is already on its way).` : '.'}
+              {formatMoney(stillOwed.toString(), order.total.currency)} still to refund
+              {BigInt(order.refunded.amountMinor) > 0n ? ` (${money(order.refunded)} refunded so far)` : ''}.{' '}
+              {seePayment ? (
+                <Link href={`/payments/${order.paymentId}`} className="font-semibold underline underline-offset-2">
+                  Refund the customer
+                </Link>
+              ) : (
+                'Ask someone who can issue refunds.'
+              )}
             </Alert>
           ) : (
-            <Alert tone="success">Refunded in full.</Alert>
+            <Alert tone="success">Refunded in full: {money(order.refunded)}.</Alert>
           )}
         </div>
       ) : null}
