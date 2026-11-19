@@ -6,6 +6,7 @@
     "dev": "tsc -p tsconfig.build.json --watch",
     "start": "node dist/main.js",
     "admin:create": "node --env-file-if-exists=.env dist/create-admin.js",
+    "seed:dev": "node --env-file-if-exists=.env dist/seed-dev-catalogue.js",
     "build": "prisma generate && tsc -p tsconfig.build.json",
     "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
     "test": "prisma generate && jest",
