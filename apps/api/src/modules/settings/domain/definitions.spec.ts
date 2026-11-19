@@ -32,6 +32,10 @@ describe('setting definitions', () => {
     expect(() => parseValue('store.name', 'x'.repeat(61))).toThrow('at most 60');
   });
 
+  it('leave staff two-step sign-in optional until an administrator turns it on', () => {
+    expect(SETTINGS['security.staffMfaRequired'].default).toBe(false);
+  });
+
   it('recognise only known keys', () => {
     expect(isSettingKey('store.name')).toBe(true);
     expect(isSettingKey('toString')).toBe(false);

@@ -9,7 +9,7 @@ Staff sign in with a password and then a code from an authenticator app (TOTP, R
 ### Setting it up
 
 1. A new staff member signs in with their password. Their session is *unverified*.
-2. While the setting **Staff must use two-step sign-in** is on (the default), an unverified session can only reach the set-up page (`/account/security`) and its API routes (marked `@AllowWithoutMfa`). Every other staff route answers `403 auth.mfa_setup_required`.
+2. While the setting **Staff must use two-step sign-in** is on (Settings → Sign-in and security; off by default, so an administrator turns it on once they have set up their own app), an unverified session can only reach the set-up page (`/account/security`) and its API routes (marked `@AllowWithoutMfa`). Every other staff route answers `403 auth.mfa_setup_required`.
 3. The page shows a setup key and an `otpauth://` link. The person adds it to their app and types the code it shows.
 4. On a correct code the API turns MFA on in one transaction:
    - marks the current session verified, and ends every other session of that account;

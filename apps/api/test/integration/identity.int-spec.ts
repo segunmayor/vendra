@@ -642,6 +642,9 @@ describe('staff two-step sign-in', () => {
     await app.get(SettingsService).update(root, { 'security.staffMfaRequired': value });
   };
 
+  // Off by default; these tests are about what happens once an administrator turns it on.
+  beforeAll(() => setStaffMfaRequired(true));
+
   it('limits staff to setting it up until they have', async () => {
     const person = await newStaff(['staff.manage']);
     const blocked = await call('GET', 'admin/staff', { token: person.token });

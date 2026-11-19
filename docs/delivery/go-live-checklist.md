@@ -27,6 +27,7 @@ Tick each line on launch day, and note who checked it. Items marked **Owner** de
 ### Admin setup (first administrator)
 
 - [ ] First administrator created, two-step sign-in set up, recovery codes stored safely.
+- [ ] Settings → Sign-in and security → **Staff must use two-step sign-in** turned on (it is off by default).
 - [ ] Roles created with only the permissions each job needs (orders, deliveries, catalogue, refunds, sellers). Staff accounts created. Nobody shares an account.
 - [ ] Settings, Store: store name, support email and phone, payment safety message.
 - [ ] Settings, Payments: customer site address and API address set to the production `https://` addresses.
