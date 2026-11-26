@@ -8,8 +8,9 @@ import { FileHolders } from './application/file-holders';
 import { FileStorage } from './application/file-storage';
 import { StorageMoveRunner, StorageMoveService } from './application/moves';
 import { StorageLocationService } from './application/locations';
-import { DriverFactory } from './application/ports';
+import { DriverFactory, PublicFetcher } from './application/ports';
 import { StorageDriverFactory } from './infrastructure/driver-factory';
+import { HttpPublicFetcher } from './infrastructure/public-fetcher';
 import { PrismaMoveRepository, sha256Hasher } from './infrastructure/prisma-move.repository';
 import { PrismaLocationRepository, PrismaObjectRepository } from './infrastructure/prisma-storage.repository';
 import { StorageController } from './interface/storage.controller';
@@ -17,6 +18,8 @@ import { StorageMovesController } from './interface/storage-moves.controller';
 
 /** Talks to storage services. Tests replace it so they never leave the machine. */
 export const STORAGE_DRIVERS = Symbol('STORAGE_DRIVERS');
+/** Opens public (CDN) addresses to check them. Tests replace it too. */
+export const PUBLIC_FETCHER = Symbol('PUBLIC_FETCHER');
 
 const clock = { now: () => new Date() };
 const ids = { uuid: randomUUID };
@@ -81,6 +84,7 @@ export class StorageMovePoller implements OnApplicationBootstrap, OnApplicationS
       },
     },
     { provide: STORAGE_DRIVERS, useFactory: (): DriverFactory => new StorageDriverFactory() },
+    { provide: PUBLIC_FETCHER, useFactory: (): PublicFetcher => new HttpPublicFetcher() },
     {
       provide: DriverPool,
       inject: [PrismaService, ENV, STORAGE_DRIVERS],
@@ -97,8 +101,8 @@ export class StorageMovePoller implements OnApplicationBootstrap, OnApplicationS
     },
     {
       provide: StorageLocationService,
-      inject: [PrismaService, ENV, DriverPool, FileStorage],
-      useFactory: (prisma: PrismaService, env: Env, pool: DriverPool, files: FileStorage) =>
+      inject: [PrismaService, ENV, DriverPool, FileStorage, PUBLIC_FETCHER],
+      useFactory: (prisma: PrismaService, env: Env, pool: DriverPool, files: FileStorage, fetcher: PublicFetcher) =>
         new StorageLocationService(
           new PrismaLocationRepository(prisma),
           createSealer(env.SETTINGS_ENCRYPTION_KEY, 'storage credentials'),
@@ -106,6 +110,7 @@ export class StorageMovePoller implements OnApplicationBootstrap, OnApplicationS
           ids,
           clock,
           () => files.invalidate(),
+          fetcher,
         ),
     },
   ],

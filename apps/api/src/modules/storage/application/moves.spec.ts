@@ -27,7 +27,19 @@ class Bucket implements StorageDriver {
   readonly files = new Map<string, Uint8Array>();
   failPut: string | null = null;
   corrupt = false;
+  /** Milliseconds each upload takes, by content; lets tests finish files out of order. */
+  delay: (content: Uint8Array) => number = () => 0;
+  inFlight = 0;
+  mostInFlight = 0;
   async put(key: string, content: Uint8Array) {
+    this.inFlight++;
+    this.mostInFlight = Math.max(this.mostInFlight, this.inFlight);
+    try {
+      const wait = this.delay(content);
+      if (wait) await new Promise((resolve) => setTimeout(resolve, wait));
+    } finally {
+      this.inFlight--;
+    }
     if (this.failPut) throw new StorageUnavailable(this.failPut);
     this.files.set(key, this.corrupt ? bytes('garbage') : content);
   }
@@ -66,6 +78,9 @@ class Objects implements ObjectRepository {
   }
   async find(id: string) {
     return this.rows.get(id) ?? null;
+  }
+  async findMany(ids: readonly string[]) {
+    return ids.flatMap((id) => (this.rows.has(id) ? [{ ...this.rows.get(id)!, purpose: 'product-media' }] : []));
   }
   async remove(id: string) {
     this.rows.delete(id);
@@ -112,7 +127,7 @@ class Moves implements MoveRepository {
   job: MoveJob | null = null;
   stopAfter = Infinity;
   saves = 0;
-  async create(job: Pick<MoveJob, 'id' | 'targetLocationId' | 'deleteOld' | 'total' | 'createdBy'>) {
+  async create(job: Pick<MoveJob, 'id' | 'targetLocationId' | 'deleteOld' | 'concurrency' | 'total' | 'createdBy'>) {
     if (this.job && (this.job.status === 'queued' || this.job.status === 'running')) return false;
     this.job = { ...job, status: 'queued', moved: 0, skipped: 0, failed: 0, movedBytes: 0, cursor: { holder: 0, after: null }, problems: [], message: null, createdAt: new Date(), startedAt: null, finishedAt: null };
     return true;
@@ -128,14 +143,18 @@ class Moves implements MoveRepository {
     this.job = { ...this.job, status: 'running' };
     return this.job;
   }
+  readonly saved: MoveProgress[] = [];
+  onSave: (progress: MoveProgress) => void = () => undefined;
   async progress(_id: string, progress: MoveProgress) {
     if (!this.job || this.job.status !== 'running') return false;
     if (++this.saves > this.stopAfter) {
       this.job = { ...this.job, status: 'cancelled' };
       return false;
     }
-    const { problem, ...rest } = progress;
-    this.job = { ...this.job, ...rest, problems: problem ? [problem, ...this.job.problems] : this.job.problems };
+    this.saved.push(progress);
+    this.onSave(progress);
+    const { problems, ...rest } = progress;
+    this.job = { ...this.job, ...rest, problems: [...(problems ?? []), ...this.job.problems] };
     return true;
   }
   async finish(_id: string, status: MoveJob['status'], message: string | null) {
@@ -188,7 +207,7 @@ describe('moving files into the active location', () => {
     const summary = await ctx.service.summary();
     expect(summary).toMatchObject({ activeId: 'new', database: { files: 2, bytes: 14 }, otherLocations: { files: 1 } });
 
-    const job = await ctx.service.start(actor, { deleteOld: true });
+    const job = await ctx.service.start(actor, { deleteOld: true, concurrency: 1 });
     expect(job.total).toBe(3);
     expect(await ctx.runner.runOnce()).toBe(true);
 
@@ -206,7 +225,7 @@ describe('moving files into the active location', () => {
   it('keeps old copies when asked, without counting them as still to move', async () => {
     const ctx = setup();
     const oldObject = await seed(ctx);
-    await ctx.service.start(actor, { deleteOld: false });
+    await ctx.service.start(actor, { deleteOld: false, concurrency: 1 });
     await ctx.runner.runOnce();
     expect(ctx.buckets.old.files.size).toBe(1);
     expect(ctx.objects.rows.get(oldObject)).toMatchObject({ superseded: true });
@@ -220,7 +239,7 @@ describe('moving files into the active location', () => {
     const stored = await ctx.files.putIn((await ctx.locations.find('new'))!, { purpose: 'product-media', contentType: 'image/png', extension: 'png', content: there, sha256: sha(there) });
     ctx.holder.rows.set('d', { inline: null, objectId: stored.objectId, sha256: sha(there), sizeBytes: there.length });
     ctx.holder.changeDuringCopy = 'b';
-    await ctx.service.start(actor, { deleteOld: true });
+    await ctx.service.start(actor, { deleteOld: true, concurrency: 1 });
     await ctx.runner.runOnce();
     expect(ctx.moves.job).toMatchObject({ status: 'completed', moved: 2, skipped: 2 });
     // The copy made for the changed row was removed again.
@@ -233,7 +252,7 @@ describe('moving files into the active location', () => {
     await seed(ctx);
     ctx.holder.rows.set('a', { ...ctx.holder.rows.get('a')!, sha256: 'not-the-real-hash' });
     ctx.buckets.new.corrupt = true;
-    await ctx.service.start(actor, { deleteOld: true });
+    await ctx.service.start(actor, { deleteOld: true, concurrency: 1 });
     await ctx.runner.runOnce();
     expect(ctx.moves.job).toMatchObject({ status: 'completed', moved: 0, failed: 3 });
     expect(ctx.moves.job!.message).toContain('3 files could not be moved');
@@ -251,7 +270,7 @@ describe('moving files into the active location', () => {
       ctx.holder.rows.set(`r${String(index).padStart(2, '0')}`, { inline: content, objectId: null, sha256: sha(content), sizeBytes: content.length });
     }
     ctx.buckets.new.failPut = 'The storage service took too long to answer. Try again.';
-    await ctx.service.start(actor, { deleteOld: true });
+    await ctx.service.start(actor, { deleteOld: true, concurrency: 1 });
     await ctx.runner.runOnce();
     expect(ctx.moves.job).toMatchObject({ status: 'failed', failed: 10 });
     expect(ctx.moves.job!.message).toContain('took too long');
@@ -260,14 +279,14 @@ describe('moving files into the active location', () => {
   it('stops when staff stop it, and when another location becomes active', async () => {
     const stopped = setup();
     await seed(stopped);
-    await stopped.service.start(actor, { deleteOld: true });
+    await stopped.service.start(actor, { deleteOld: true, concurrency: 1 });
     stopped.moves.stopAfter = 1;
     await stopped.runner.runOnce();
     expect(stopped.moves.job).toMatchObject({ status: 'cancelled', moved: 1 });
 
     const switched = setup();
     await seed(switched);
-    await switched.service.start(actor, { deleteOld: true });
+    await switched.service.start(actor, { deleteOld: true, concurrency: 1 });
     switched.locations.rows.set('new', { ...switched.locations.rows.get('new')!, active: false });
     await switched.runner.runOnce();
     expect(switched.moves.job).toMatchObject({ status: 'cancelled', moved: 0 });
@@ -276,11 +295,85 @@ describe('moving files into the active location', () => {
 
   it('refuses to start with nothing to move, no active location, or a move already running', async () => {
     const ctx = setup();
-    await expect(ctx.service.start(actor, { deleteOld: true })).rejects.toThrow('Every file is already in New bucket');
+    await expect(ctx.service.start(actor, { deleteOld: true, concurrency: 1 })).rejects.toThrow('Every file is already in New bucket');
     await seed(ctx);
-    await ctx.service.start(actor, { deleteOld: true });
-    await expect(ctx.service.start(actor, { deleteOld: true })).rejects.toThrow('already being moved');
+    await ctx.service.start(actor, { deleteOld: true, concurrency: 1 });
+    await expect(ctx.service.start(actor, { deleteOld: true, concurrency: 1 })).rejects.toThrow('already being moved');
     ctx.locations.rows.set('new', { ...ctx.locations.rows.get('new')!, active: false });
-    await expect(ctx.service.start(actor, { deleteOld: true })).rejects.toThrow('Make a storage location active first');
+    await expect(ctx.service.start(actor, { deleteOld: true, concurrency: 1 })).rejects.toThrow('Make a storage location active first');
+  });
+
+  describe('several files at once', () => {
+    function many(ctx: ReturnType<typeof setup>, count: number) {
+      for (let index = 0; index < count; index++) {
+        const content = bytes(`photo ${String(index).padStart(3, '0')}`);
+        ctx.holder.rows.set(`r${String(index).padStart(3, '0')}`, { inline: content, objectId: null, sha256: sha(content), sizeBytes: content.length });
+      }
+    }
+
+    it('copies up to the chosen number of files at the same time', async () => {
+      const ctx = setup();
+      many(ctx, 40);
+      ctx.buckets.new.delay = () => 5;
+      await ctx.service.start(actor, { deleteOld: true, concurrency: 4 });
+      await ctx.runner.runOnce();
+      expect(ctx.moves.job).toMatchObject({ status: 'completed', moved: 40, failed: 0, concurrency: 4 });
+      // Each upload is followed by a read-back, so uploads overlap up to the limit and never beyond.
+      expect(ctx.buckets.new.mostInFlight).toBe(4);
+      expect([...ctx.holder.rows.values()].every((row) => row.inline === null)).toBe(true);
+    });
+
+    it('never saves a position past a file that is still being copied', async () => {
+      const ctx = setup();
+      many(ctx, 12);
+      // The first file of each group of four is slow, so later files finish first.
+      ctx.buckets.new.delay = (content) => (/photo 0(00|04|08)/.test(Buffer.from(content).toString()) ? 30 : 1);
+      ctx.moves.onSave = (progress) => {
+        if (!progress.cursor.after) return;
+        for (const [rowId, row] of ctx.holder.rows) {
+          if (rowId <= progress.cursor.after) expect(row.inline).toBeNull();
+        }
+      };
+      await ctx.service.start(actor, { deleteOld: true, concurrency: 4 });
+      await ctx.runner.runOnce();
+      expect(ctx.moves.job).toMatchObject({ status: 'completed', moved: 12 });
+      const positions = ctx.moves.saved.map((progress) => progress.cursor.after).filter(Boolean) as string[];
+      expect(positions).toEqual([...positions].sort());
+      expect(positions.at(-1)).toBe('r011');
+    });
+
+    it('counts failures in file order when files run in parallel', async () => {
+      const ctx = setup();
+      many(ctx, 30);
+      ctx.buckets.new.failPut = 'The storage service took too long to answer. Try again.';
+      await ctx.service.start(actor, { deleteOld: true, concurrency: 5 });
+      await ctx.runner.runOnce();
+      expect(ctx.moves.job).toMatchObject({ status: 'failed', failed: 10 });
+      expect(ctx.moves.job!.problems).toHaveLength(10);
+      // No file was left without its bytes.
+      expect([...ctx.holder.rows.values()].every((row) => row.inline !== null)).toBe(true);
+    });
+
+    it('starts no new files once staff stop it', async () => {
+      const ctx = setup();
+      many(ctx, 30);
+      ctx.buckets.new.delay = () => 2;
+      ctx.moves.stopAfter = 2;
+      await ctx.service.start(actor, { deleteOld: true, concurrency: 3 });
+      await ctx.runner.runOnce();
+      expect(ctx.moves.job!.status).toBe('cancelled');
+      const moved = [...ctx.holder.rows.values()].filter((row) => row.inline === null).length;
+      // Only the files already started finish (each is whole, in the new location).
+      expect(moved).toBeLessThanOrEqual(2 + 3);
+      expect(ctx.buckets.new.files.size).toBe(moved);
+    });
+
+    it('refuses a number of files at a time outside 1 to 10', async () => {
+      const ctx = setup();
+      many(ctx, 1);
+      await expect(ctx.service.start(actor, { deleteOld: true, concurrency: 0 })).rejects.toThrow('from 1 to 10');
+      await expect(ctx.service.start(actor, { deleteOld: true, concurrency: 11 })).rejects.toThrow('from 1 to 10');
+    });
   });
 });
+

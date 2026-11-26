@@ -31,6 +31,27 @@ const PREFIX: FieldSpec = {
   default: 'vendra',
 };
 
+/** Optional delivery of product photos from a CDN or public bucket address, for every service but MEGA. */
+const PUBLIC: readonly FieldSpec[] = [
+  {
+    key: 'publicDelivery',
+    label: 'Serve product photos from a public address (CDN)',
+    help: 'Shoppers’ browsers then load photos straight from the address below instead of through Vendra. Seller documents always go through Vendra.',
+    required: false,
+    default: 'false',
+    kind: 'boolean',
+  },
+  {
+    key: 'publicBaseUrl',
+    label: 'Public address',
+    help:
+      'Where <address>/<file key> opens a file, with the CDN’s origin set to this bucket or container. Such as https://d1234abcd.cloudfront.net, https://photos.yourshop.ng (R2 custom domain), https://pub-xxxx.r2.dev, https://yourzone.b-cdn.net, or https://<endpoint>.azureedge.net/<container>. Allow public access to <folder>/product-media/ only.',
+    required: false,
+    kind: 'url',
+    placeholder: 'https://',
+  },
+];
+
 const S3_KEYS: readonly FieldSpec[] = [
   { key: 'accessKeyId', label: 'Access key ID', help: 'From a user or key that can read, write and delete objects in this bucket only.', required: true },
   { key: 'secretAccessKey', label: 'Secret access key', help: 'Shown once when the key is created.', required: true },
@@ -51,6 +72,7 @@ export const STORAGE_TYPES: readonly StorageType[] = [
       { key: 'region', label: 'Region', help: 'Where the bucket is, such as af-south-1 (Cape Town) or eu-west-2 (London).', required: true, placeholder: 'af-south-1' },
       { key: 'bucket', label: 'Bucket', help: 'The bucket name, not its address.', required: true },
       PREFIX,
+      ...PUBLIC,
     ],
     credentials: S3_KEYS,
   },
@@ -81,6 +103,7 @@ export const STORAGE_TYPES: readonly StorageType[] = [
         default: 'false',
         kind: 'boolean',
       },
+      ...PUBLIC,
     ],
     credentials: S3_KEYS,
   },
@@ -92,6 +115,7 @@ export const STORAGE_TYPES: readonly StorageType[] = [
     config: [
       { key: 'bucket', label: 'Bucket', help: 'The bucket name, not its address.', required: true },
       PREFIX,
+      ...PUBLIC,
     ],
     credentials: [
       {
@@ -119,6 +143,7 @@ export const STORAGE_TYPES: readonly StorageType[] = [
         required: false,
         kind: 'url',
       },
+      ...PUBLIC,
     ],
     credentials: [{ key: 'accountKey', label: 'Account key', help: 'Storage account, Security + networking, Access keys: key1 or key2.', required: true }],
   },
@@ -219,6 +244,8 @@ export function checkLocation(
     }
   }
 
+  if (config.publicDelivery === 'true' && !config.publicBaseUrl) throw invalid('Enter the public address, or turn off serving photos from it');
+
   const secrets: Record<string, string> = {};
   for (const field of kind.credentials) {
     const value = (incoming[field.key] ?? '').trim() || saved[field.key] || '';
@@ -235,6 +262,15 @@ export function checkLocation(
 
 /** What a file is for. Part of its storage key, so the bucket is easy to browse. */
 export type FilePurpose = 'product-media' | 'seller-documents';
+
+/** Whether product photos in this location may be served from its public address. */
+export const servesPublicly = (location: Pick<LocationState, 'config'>): boolean =>
+  location.config.publicDelivery === 'true' && Boolean(location.config.publicBaseUrl);
+
+/** The public address of a stored file: the base, then the key with each part encoded. */
+export function publicUrl(base: string, key: string): string {
+  return `${base.replace(/\/+$/, '')}/${key.split('/').map(encodeURIComponent).join('/')}`;
+}
 
 const EXTENSIONS: Readonly<Record<string, string>> = {
   'image/jpeg': 'jpg',

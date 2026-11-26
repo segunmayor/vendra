@@ -6304,6 +6304,10 @@
           "deleteOld": {
             "type": "boolean"
           },
+          "concurrency": {
+            "type": "number",
+            "description": "Files copied at the same time"
+          },
           "total": {
             "type": "number",
             "description": "Files that needed moving when the move started"
@@ -6353,6 +6357,7 @@
           "targetLocationId",
           "status",
           "deleteOld",
+          "concurrency",
           "total",
           "moved",
           "skipped",
@@ -6407,6 +6412,13 @@
             "type": "boolean",
             "default": true,
             "description": "Delete the copy in an earlier storage location once a file is moved. Files in the database are always cleared from it."
+          },
+          "concurrency": {
+            "type": "number",
+            "default": 4,
+            "minimum": 1,
+            "maximum": 10,
+            "description": "Files copied at the same time"
           }
         }
       },

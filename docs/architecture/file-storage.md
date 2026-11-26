@@ -57,7 +57,11 @@ background (`StorageMovePoller`, every `STORAGE_MOVE_POLL_MS`; 0 turns it off).
 - Old copies in other locations are deleted afterwards if staff ask (the default), or kept and
   marked `supersededAt` (not counted as in use; a location holding only such copies can be
   removed).
-- Progress is saved after every file, so a restart resumes where it stopped; a lease lets
+- Staff choose how many files are copied at the same time (1 to 10, default 4). Outcomes are
+  recorded in file order: the saved position only passes a file once every file before it is
+  done, so a restart never skips one (a file finished but not yet recorded is simply found to be
+  in place, and skipped). MEGA's driver still runs one request at a time.
+- Progress is saved as files finish, so a restart resumes where it stopped; a lease lets
   another API instance take over a crashed move. One move at a time (partial unique index).
 - A move stops if staff stop it, if another location becomes active, or after 10 files in a row
   fail (the target is probably down). Files that fail stay where they are and keep working;
@@ -65,7 +69,30 @@ background (`StorageMovePoller`, every `STORAGE_MOVE_POLL_MS`; 0 turns it off).
 - Bytes cleared from the database are returned to PostgreSQL by autovacuum; the database file on
   disk shrinks only after a `VACUUM FULL` of those tables, done in a maintenance window.
 
+## Public address (CDN) for product photos
+
+Each location except MEGA has an optional "Serve product photos from a public address (CDN)"
+setting with a public address, such as a CloudFront distribution, an R2 custom domain or
+r2.dev address, a Bunny pull zone, or an Azure Front Door / CDN endpoint. `<address>/<file key>`
+must open a file.
+
+- Only product photos are served publicly. Seller documents always go through Vendra.
+- The check (on save, Test connection and Make active) writes a test photo and a test seller
+  document. The photo must open at the public address with the same bytes; the document must
+  not. An address where seller documents can be opened is refused, so a bucket made public by
+  mistake is caught before shoppers are sent to it.
+- Settings that serve photos publicly are checked before they are saved, like the active
+  location's.
+- Delivery is used only while the location's last check passed. A failed check sends photos
+  back through Vendra at once on that server (other API instances within a minute).
+- Product image addresses stay `/media/<id>.<ext>` in the catalogue. The Store API resolves them
+  to public addresses (product cards, product pages and basket lines), cached for a minute and
+  dropped when storage settings change. The old `/media/` links answer with a 302 to the public
+  address (cached for an hour), in the API and in each portal.
+- In development only, the portals' Content-Security-Policy also allows images from
+  `http://localhost` and `http://127.0.0.1`, for a local CDN stand-in.
+
 ## Not yet
 
 - Moving files back into the database.
-- Serving photos straight from a CDN or public bucket address.
+- Signed (expiring) CDN addresses: the CDN path for product photos is public.

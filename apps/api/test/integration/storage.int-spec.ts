@@ -8,7 +8,8 @@ import { PERMISSIONS } from '../../src/modules/identity/domain/permissions';
 import type { DriverFactory, StorageDriver } from '../../src/modules/storage/application/ports';
 import { StorageUnavailable } from '../../src/modules/storage/application/ports';
 import { StorageMoveRunner } from '../../src/modules/storage/application/moves';
-import { STORAGE_DRIVERS } from '../../src/modules/storage/storage.module';
+import { PUBLIC_FETCHER, STORAGE_DRIVERS } from '../../src/modules/storage/storage.module';
+import type { PublicFetcher } from '../../src/modules/storage/application/ports';
 import { Principal } from '../../src/shared-kernel';
 import { verifiedStaffToken } from './staff-mfa';
 
@@ -71,6 +72,9 @@ class MemoryBucket implements StorageDriver {
 }
 
 const bucket = new MemoryBucket();
+/** A CDN in front of the memory bucket, exposing only product photos unless a test opens it all up. */
+const CDN = 'https://cdn.vendra.test';
+const cdn = { exposeEverything: false };
 const created: { secrets: Record<string, string> }[] = [];
 const png = (seed: string) => new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...Buffer.from(seed)]);
 const tag = randomUUID().slice(0, 8);
@@ -106,6 +110,12 @@ beforeAll(async () => {
   jest.spyOn(drivers, 'create').mockImplementation((_kind, _type, _config, secrets) => {
     created.push({ secrets: { ...secrets } });
     return bucket;
+  });
+
+  jest.spyOn(app.get<PublicFetcher>(PUBLIC_FETCHER), 'get').mockImplementation(async (url: string) => {
+    const key = decodeURIComponent(url.slice(CDN.length + 1));
+    const file = bucket.files.get(key);
+    return file && (cdn.exposeEverything || key.includes('/product-media/')) ? { status: 200, body: file } : { status: 403, body: new Uint8Array() };
   });
 
   admin = await staffToken(['settings.manage', 'catalogue.manage']);
@@ -283,8 +293,9 @@ describe('file storage locations', () => {
     expect(before.otherLocations.files).toBeGreaterThanOrEqual(2);
     expect(before.running).toBeNull();
 
-    const job = ok(await call('POST', 'admin/storage/moves', { token: admin, body: { deleteOld: true } }), 201);
-    expect(job).toMatchObject({ status: 'queued', total: before.database.files + before.otherLocations.files, deleteOld: true });
+    expect((await call('POST', 'admin/storage/moves', { token: admin, body: { concurrency: 11 } })).status).toBe(400);
+    const job = ok(await call('POST', 'admin/storage/moves', { token: admin, body: { deleteOld: true, concurrency: 3 } }), 201);
+    expect(job).toMatchObject({ status: 'queued', total: before.database.files + before.otherLocations.files, deleteOld: true, concurrency: 3 });
     expect((await call('POST', 'admin/storage/moves', { token: admin, body: {} })).body.code).toBe('storage.move_running');
     expect(ok(await call('GET', 'admin/storage/moves/summary', { token: admin })).running.id).toBe(job.id);
 
@@ -319,10 +330,56 @@ describe('file storage locations', () => {
     const target = ok(await call('GET', 'admin/storage/locations', { token: admin })).locations[0];
     ok(await call('POST', `admin/storage/locations/${target.id}/activate`, { token: admin }));
     const job = ok(await call('POST', 'admin/storage/moves', { token: admin, body: { deleteOld: false } }), 201);
+    expect(job.concurrency).toBe(4);
     const stopped = ok(await call('POST', `admin/storage/moves/${job.id}/cancel`, { token: admin }));
     expect(stopped).toMatchObject({ status: 'cancelled' });
     expect(await app.get(StorageMoveRunner).runOnce()).toBe(false);
     expect(await prisma.productMedia.count({ where: { content: { not: null } } })).toBe(1);
+  });
+
+  it('serves product photos from a public address (CDN) once it passes its check, and never seller documents', async () => {
+    const config = { ...r2.config, prefix: `cdn-${tag}`, publicDelivery: 'true', publicBaseUrl: CDN };
+
+    cdn.exposeEverything = true;
+    const exposed = await call('POST', 'admin/storage/locations', { token: admin, body: { ...r2, name: `Open CDN ${tag}`, config } });
+    expect(exposed.status).toBe(422);
+    expect(exposed.body.detail).toContain('Seller documents can be opened by anyone');
+    cdn.exposeEverything = false;
+
+    const location = ok(await call('POST', 'admin/storage/locations', { token: admin, body: { ...r2, name: `CDN ${tag}`, config } }), 201);
+    expect(location.lastCheck).toMatchObject({ ok: true });
+    ok(await call('POST', `admin/storage/locations/${location.id}/activate`, { token: admin }));
+
+    const category = ok(await call('POST', 'admin/categories', { token: admin, body: { name: `CDN Things ${tag}`, attributes: [] } }), 201);
+    const product = ok(await call('POST', 'admin/products', { token: admin, body: { categoryId: category.id, name: `CDN Product ${tag}`, description: 'x', brandId: null, attributes: {} } }), 201);
+    const variant = ok(await call('POST', `admin/products/${product.id}/variants`, { token: admin, body: { sku: `CDN-${tag}`.toUpperCase(), weightGrams: 100, options: {} } }), 201);
+    const withPhoto = ok(await call('POST', `admin/products/${product.id}/images`, { token: admin, form: photoForm(png(`cdn-${tag}`)) }));
+    const path = (withPhoto.images as string[])[0]!;
+    // Staff keep seeing the stable path; shoppers get the CDN address.
+    expect(path).toMatch(/^\/media\//);
+    ok(await call('POST', `admin/products/${product.id}/publish`, { token: admin }));
+    const listing = ok(await call('POST', 'admin/listings', { token: admin, body: { variantId: variant.id, priceMinor: '500000', currency: 'NGN' } }), 201);
+    ok(await call('POST', `admin/listings/${listing.id}/activate`, { token: admin }));
+
+    const detail = ok(await call('GET', `store/products/${product.slug}`));
+    const mediaId = path.match(/([0-9a-f-]{36})/)![1]!;
+    const object = await prisma.storageObject.findUniqueOrThrow({ where: { id: (await prisma.productMedia.findUniqueOrThrow({ where: { id: mediaId } })).storageObjectId! } });
+    expect(detail.images).toEqual([`${CDN}/${object.key}`]);
+
+    const old = await fetch(`${base}/v1/store${path}`, { redirect: 'manual' });
+    expect(old.status).toBe(302);
+    expect(old.headers.get('location')).toBe(`${CDN}/${object.key}`);
+
+    // When the CDN fails its check, photos go back through Vendra at once.
+    cdn.exposeEverything = true;
+    ok(await call('POST', `admin/storage/locations/${location.id}/test`, { token: admin }));
+    cdn.exposeEverything = false;
+    const after = await fetch(`${base}/v1/store${path}`, { redirect: 'manual' });
+    expect(after.status).toBe(200);
+    expect(ok(await call('GET', `store/products/${product.slug}`)).images).toEqual([path]);
+    // Once a check passes again, the CDN is used again.
+    ok(await call('POST', `admin/storage/locations/${location.id}/test`, { token: admin }));
+    expect(ok(await call('GET', `store/products/${product.slug}`)).images).toEqual([`${CDN}/${object.key}`]);
   });
 });
 

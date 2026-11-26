@@ -99,6 +99,10 @@ export class PrismaObjectRepository implements ObjectRepository {
     return this.prisma.storageObject.findUnique({ where: { id }, select: { id: true, locationId: true, key: true, contentType: true, sizeBytes: true } });
   }
 
+  async findMany(ids: readonly string[]): Promise<(StoredObject & { purpose: string })[]> {
+    return this.prisma.storageObject.findMany({ where: { id: { in: [...ids] } }, select: { id: true, locationId: true, key: true, contentType: true, sizeBytes: true, purpose: true } });
+  }
+
   async remove(id: string): Promise<void> {
     await this.prisma.storageObject.deleteMany({ where: { id } });
   }

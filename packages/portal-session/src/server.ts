@@ -46,15 +46,22 @@ const MEDIA_FILE = /^[0-9a-f-]{36}\.(?:jpg|png|gif|webp|avif)$/;
 
 /**
  * GET handler body for app/media/[file]/route.ts: a product photo from the API, served from the
- * portal's own address so product image paths ("/media/<id>.jpg") work in every portal.
+ * portal's own address so product image paths ("/media/<id>.jpg") work in every portal. Photos
+ * kept behind a CDN are redirected there.
  */
 export async function mediaFile(file: string): Promise<Response> {
   if (!MEDIA_FILE.test(file)) return new Response('Not found', { status: 404 });
   let upstream: Response;
   try {
-    upstream = await fetch(`${settings().apiBaseUrl}/v1/store/media/${file}`, { cache: 'no-store' });
+    upstream = await fetch(`${settings().apiBaseUrl}/v1/store/media/${file}`, { cache: 'no-store', redirect: 'manual' });
   } catch {
     return new Response('Unavailable', { status: 503 });
+  }
+  // The photo is served from a CDN: send the browser there rather than fetching it through here.
+  const location = upstream.headers.get('location');
+  // http only for a CDN stand-in on this machine, as the API allows for storage addresses.
+  if (upstream.status >= 300 && upstream.status < 400 && location && /^(https:\/\/|http:\/\/(localhost|127\.0\.0\.1)[:/])/i.test(location)) {
+    return new Response(null, { status: 302, headers: { location, 'cache-control': upstream.headers.get('cache-control') ?? 'public, max-age=3600' } });
   }
   if (!upstream.ok || !upstream.body) return new Response('Not found', { status: upstream.status === 404 ? 404 : 502 });
   return new Response(upstream.body, {

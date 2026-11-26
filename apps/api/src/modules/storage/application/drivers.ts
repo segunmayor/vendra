@@ -1,5 +1,5 @@
-import { storageType } from '../domain/location';
-import { DriverFactory, LocationState, SecretSealer, StorageDriver, StorageUnavailable } from './ports';
+import { publicUrl, servesPublicly, storageType } from '../domain/location';
+import { DriverFactory, LocationState, PublicFetcher, SecretSealer, StorageDriver, StorageUnavailable } from './ports';
 
 /**
  * Decrypts a location's credentials and keeps one driver per location version, so connections
@@ -51,4 +51,39 @@ export async function probe(driver: StorageDriver, key: string): Promise<void> {
     throw new StorageUnavailable('A test file was written but came back different. Check the bucket or folder settings.');
   }
   await driver.delete(key);
+}
+
+const same = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((byte, index) => byte === b[index]);
+
+/**
+ * For a location serving photos publicly: a test photo must open at the public address, and a
+ * test seller document must not. Stops a whole bucket being made public by mistake.
+ */
+export async function probePublic(driver: StorageDriver, fetcher: PublicFetcher, location: Pick<LocationState, 'config'>, id: string): Promise<void> {
+  if (!servesPublicly(location)) return;
+  const base = location.config.publicBaseUrl!;
+  const folder = location.config.prefix ?? '';
+  const photoKey = [folder, 'product-media', '.vendra-checks', `check-${id}.txt`].filter(Boolean).join('/');
+  const documentKey = [folder, 'seller-documents', '.vendra-checks', `check-${id}.txt`].filter(Boolean).join('/');
+  const content = new TextEncoder().encode(`Vendra public address check ${id}. Safe to delete.`);
+  await driver.put(photoKey, content, 'text/plain');
+  await driver.put(documentKey, content, 'text/plain');
+  try {
+    const photo = await fetcher.get(publicUrl(base, photoKey)).catch(() => null);
+    if (!photo) throw new StorageUnavailable(`The public address ${base} could not be reached. Check it, and that its CDN is set up.`);
+    if (photo.status !== 200 || !same(photo.body, content)) {
+      throw new StorageUnavailable(
+        `A test photo did not open at the public address (it answered ${photo.status}). Check that ${base}/<file key> serves this ${location.config.bucket ? 'bucket' : 'container'}, and that ${folder ? `${folder}/` : ''}product-media/ is public.`,
+      );
+    }
+    const document = await fetcher.get(publicUrl(base, documentKey)).catch(() => null);
+    if (document && document.status === 200 && same(document.body, content)) {
+      throw new StorageUnavailable(
+        `Seller documents can be opened by anyone at the public address. Limit public access to ${folder ? `${folder}/` : ''}product-media/ only, then test again.`,
+      );
+    }
+  } finally {
+    await driver.delete(photoKey).catch(() => undefined);
+    await driver.delete(documentKey).catch(() => undefined);
+  }
 }

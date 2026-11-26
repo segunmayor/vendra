@@ -44,18 +44,18 @@ export const REMOTE_FILES = Symbol('REMOTE_FILES');
       provide: ProductMediaService,
       inject: [PrismaService, REMOTE_FILES, FileStorage],
       useFactory: (prisma: PrismaService, remote: SafeRemoteFiles, files: FileStorage) =>
-        new ProductMediaService(new PrismaMediaStore(prisma, files), remote, sha256Hasher, { uuid: randomUUID }),
+        new ProductMediaService(new PrismaMediaStore(prisma, files), remote, sha256Hasher, { uuid: randomUUID }, files),
     },
     {
       provide: CatalogueQueries,
-      inject: [PrismaService],
-      useFactory: (prisma: PrismaService) => new CatalogueQueries(new PrismaProductRepository(prisma)),
+      inject: [PrismaService, ProductMediaService],
+      useFactory: (prisma: PrismaService, media: ProductMediaService) => new CatalogueQueries(new PrismaProductRepository(prisma), media),
     },
     {
       provide: StorefrontCatalogue,
-      inject: [PrismaService, SettingsReader],
-      useFactory: (prisma: PrismaService, settings: SettingsReader) =>
-        new StorefrontCatalogue(new PostgresProductSearch(prisma, settings), new PrismaCategoryRepository(prisma)),
+      inject: [PrismaService, SettingsReader, ProductMediaService],
+      useFactory: (prisma: PrismaService, settings: SettingsReader, media: ProductMediaService) =>
+        new StorefrontCatalogue(new PostgresProductSearch(prisma, settings), new PrismaCategoryRepository(prisma), media),
     },
   ],
   exports: [CatalogueQueries, StorefrontCatalogue, CatalogueService, ProductMediaService],

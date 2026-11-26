@@ -1,6 +1,6 @@
 import { ApplicationError, DomainError } from '../../../shared-kernel';
 import type { AttributeDefinition, AttributeValue } from '../domain/attributes';
-import type { CategoryRepository, CategoryView } from './ports';
+import type { CategoryRepository, CategoryView, ImageAddresses } from './ports';
 
 /** What customers may see of the catalogue: published products only. */
 
@@ -147,7 +147,15 @@ export class StorefrontCatalogue {
   constructor(
     private readonly search: ProductSearch,
     private readonly categories: CategoryRepository,
+    private readonly images: ImageAddresses,
   ) {}
+
+  /** Photos from a storage location's public address (CDN) where one is set up. */
+  private async withAddresses<T extends { readonly images: readonly string[] }>(products: readonly T[]): Promise<T[]> {
+    const addresses = await this.images.resolve(products.flatMap((product) => product.images));
+    if (addresses.size === 0) return [...products];
+    return products.map((product) => ({ ...product, images: product.images.map((image) => addresses.get(image) ?? image) }));
+  }
 
   async listCategories(): Promise<StorefrontCategory[]> {
     const [categories, counts] = await Promise.all([this.categories.list(), this.search.countPublishedByCategory()]);
@@ -179,7 +187,9 @@ export class StorefrontCatalogue {
       brandId = brand.id;
     }
 
-    const page = await this.search.search({ text, categoryIds, brandId }, after, input.limit);
+    const found = await this.search.search({ text, categoryIds, brandId }, after, input.limit);
+    const products = await this.withAddresses(found.items.map((item) => item.product));
+    const page = { ...found, items: found.items.map((item, index) => ({ ...item, product: products[index]! })) };
     const items = page.items
       .filter((item) => item.position.kind !== 'rank' || item.position.offset <= MAX_OFFSET)
       .map((item) => ({ product: item.product, cursor: encodeCursor(item.position) }));
@@ -188,7 +198,9 @@ export class StorefrontCatalogue {
   }
 
   async productBySlug(slug: string): Promise<PublishedProductDetail | null> {
-    const product = await this.search.findPublishedBySlug(slug);
+    const found = await this.search.findPublishedBySlug(slug);
+    if (!found) return null;
+    const [product] = await this.withAddresses([found]);
     if (!product) return null;
     const all = await this.categories.list();
     const byId = new Map(all.map((category) => [category.id, category]));

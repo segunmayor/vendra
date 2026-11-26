@@ -55,6 +55,8 @@ export interface StoredObject {
 export interface ObjectRepository {
   add(object: StoredObject & { sha256: string; purpose: FilePurpose }): Promise<void>;
   find(id: string): Promise<StoredObject | null>;
+  /** Several at once, with what each file is for. Unknown ids are left out. */
+  findMany(ids: readonly string[]): Promise<(StoredObject & { purpose: string })[]>;
   remove(id: string): Promise<void>;
   /** Marks a copy no record uses any more (kept after a move). */
   supersede(id: string, at: Date): Promise<void>;
@@ -118,6 +120,8 @@ export interface MoveJob {
   readonly targetLocationId: string;
   readonly status: MoveStatus;
   readonly deleteOld: boolean;
+  /** Files copied at the same time. */
+  readonly concurrency: number;
   readonly total: number;
   readonly moved: number;
   readonly skipped: number;
@@ -138,12 +142,13 @@ export interface MoveProgress {
   readonly failed: number;
   readonly movedBytes: number;
   readonly cursor: MoveCursor;
-  readonly problem?: MoveProblem;
+  /** New problems since the last save, newest first. */
+  readonly problems?: readonly MoveProblem[];
 }
 
 export interface MoveRepository {
   /** False if a move is already queued or running. */
-  create(job: Pick<MoveJob, 'id' | 'targetLocationId' | 'deleteOld' | 'total' | 'createdBy'>, audit: AuditEntry): Promise<boolean>;
+  create(job: Pick<MoveJob, 'id' | 'targetLocationId' | 'deleteOld' | 'concurrency' | 'total' | 'createdBy'>, audit: AuditEntry): Promise<boolean>;
   find(id: string): Promise<MoveJob | null>;
   recent(limit: number): Promise<MoveJob[]>;
   /** Takes a queued job, or a running one whose worker stopped renewing its lease. */
@@ -158,4 +163,9 @@ export interface MoveRepository {
 /** sha256 of file contents, as lower-case hex. */
 export interface Hasher {
   sha256(bytes: Uint8Array): string;
+}
+
+/** Fetches a public address the way a shopper's browser would: no credentials. */
+export interface PublicFetcher {
+  get(url: string): Promise<{ status: number; body: Uint8Array }>;
 }

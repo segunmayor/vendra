@@ -13,7 +13,8 @@ export function securityHeaders({ production, formTargets = [] }) {
     "default-src 'self'",
     `script-src 'self' 'unsafe-inline'${production ? '' : " 'unsafe-eval'"}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https:",
+        // In development, photos may come from a CDN stand-in on this machine.
+    `img-src 'self' data: blob: https:${production ? '' : ' http://localhost:* http://127.0.0.1:*'}`,
     "font-src 'self' data:",
     `connect-src 'self'${production ? '' : ' ws: wss:'}`,
     "object-src 'none'",
