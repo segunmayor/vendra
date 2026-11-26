@@ -71,7 +71,9 @@ export async function removeLocation(id: string, _state: FormState): Promise<For
 }
 
 export async function startMove(_state: FormState, data: FormData): Promise<FormState> {
-  const result = await session.mutate((api) => api.POST('/v1/admin/storage/moves', { body: { deleteOld: data.get('deleteOld') === 'on' } }));
+  const concurrency = Number(text(data, 'concurrency') || '4');
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 10) return invalid('Choose how many files to move at a time, from 1 to 10');
+  const result = await session.mutate((api) => api.POST('/v1/admin/storage/moves', { body: { deleteOld: data.get('deleteOld') === 'on', concurrency } }));
   revalidatePath(`${HOME}/move`);
   revalidatePath(HOME);
   if (!result.ok) return invalid(result.message);

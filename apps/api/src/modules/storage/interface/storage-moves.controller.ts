@@ -4,11 +4,11 @@ import { z } from 'zod';
 import { CurrentPrincipal, RequirePermission, Surface } from '../../../platform/http/auth.decorators';
 import { ZodPipe } from '../../../platform/http/zod.pipe';
 import { Principal } from '../../../shared-kernel';
-import { StorageMoveService } from '../application/moves';
+import { MAX_CONCURRENCY, StorageMoveService } from '../application/moves';
 import { MoveJob } from '../application/ports';
 
 const id = new ZodPipe(z.uuid());
-const startSchema = z.object({ deleteOld: z.boolean().default(true) });
+const startSchema = z.object({ deleteOld: z.boolean().default(true), concurrency: z.number().int().min(1).max(MAX_CONCURRENCY).default(4) });
 const listSchema = z.object({ limit: z.coerce.number().int().min(1).max(50).default(10) });
 
 class SizeResponse {
@@ -28,6 +28,7 @@ export class MoveJobResponse {
   @ApiProperty() targetLocationId!: string;
   @ApiProperty({ enum: ['queued', 'running', 'completed', 'cancelled', 'failed'] }) status!: string;
   @ApiProperty() deleteOld!: boolean;
+  @ApiProperty({ description: 'Files copied at the same time' }) concurrency!: number;
   @ApiProperty({ description: 'Files that needed moving when the move started' }) total!: number;
   @ApiProperty() moved!: number;
   @ApiProperty({ description: 'Already there, or changed while being moved' }) skipped!: number;
@@ -50,6 +51,8 @@ export class MoveSummaryResponse {
 class StartMoveDto {
   @ApiPropertyOptional({ default: true, description: 'Delete the copy in an earlier storage location once a file is moved. Files in the database are always cleared from it.' })
   deleteOld?: boolean;
+  @ApiPropertyOptional({ default: 4, minimum: 1, maximum: MAX_CONCURRENCY, description: 'Files copied at the same time' })
+  concurrency?: number;
 }
 
 const view = (job: MoveJob): MoveJobResponse => {
@@ -86,7 +89,7 @@ export class StorageMovesController {
   @ApiOperation({ operationId: 'adminStartStorageMove', summary: 'Moves every file not yet in the active location into it, in the background' })
   @ApiCreatedResponse({ type: MoveJobResponse })
   async start(@CurrentPrincipal() actor: Principal, @Body(new ZodPipe(startSchema)) body: StartMoveDto): Promise<MoveJobResponse> {
-    return view(await this.moves.start(actor, { deleteOld: body.deleteOld ?? true }));
+    return view(await this.moves.start(actor, { deleteOld: body.deleteOld ?? true, concurrency: body.concurrency ?? 4 }));
   }
 
   @Get(':id')

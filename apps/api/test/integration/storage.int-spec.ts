@@ -283,8 +283,9 @@ describe('file storage locations', () => {
     expect(before.otherLocations.files).toBeGreaterThanOrEqual(2);
     expect(before.running).toBeNull();
 
-    const job = ok(await call('POST', 'admin/storage/moves', { token: admin, body: { deleteOld: true } }), 201);
-    expect(job).toMatchObject({ status: 'queued', total: before.database.files + before.otherLocations.files, deleteOld: true });
+    expect((await call('POST', 'admin/storage/moves', { token: admin, body: { concurrency: 11 } })).status).toBe(400);
+    const job = ok(await call('POST', 'admin/storage/moves', { token: admin, body: { deleteOld: true, concurrency: 3 } }), 201);
+    expect(job).toMatchObject({ status: 'queued', total: before.database.files + before.otherLocations.files, deleteOld: true, concurrency: 3 });
     expect((await call('POST', 'admin/storage/moves', { token: admin, body: {} })).body.code).toBe('storage.move_running');
     expect(ok(await call('GET', 'admin/storage/moves/summary', { token: admin })).running.id).toBe(job.id);
 
@@ -319,6 +320,7 @@ describe('file storage locations', () => {
     const target = ok(await call('GET', 'admin/storage/locations', { token: admin })).locations[0];
     ok(await call('POST', `admin/storage/locations/${target.id}/activate`, { token: admin }));
     const job = ok(await call('POST', 'admin/storage/moves', { token: admin, body: { deleteOld: false } }), 201);
+    expect(job.concurrency).toBe(4);
     const stopped = ok(await call('POST', `admin/storage/moves/${job.id}/cancel`, { token: admin }));
     expect(stopped).toMatchObject({ status: 'cancelled' });
     expect(await app.get(StorageMoveRunner).runOnce()).toBe(false);

@@ -57,7 +57,11 @@ background (`StorageMovePoller`, every `STORAGE_MOVE_POLL_MS`; 0 turns it off).
 - Old copies in other locations are deleted afterwards if staff ask (the default), or kept and
   marked `supersededAt` (not counted as in use; a location holding only such copies can be
   removed).
-- Progress is saved after every file, so a restart resumes where it stopped; a lease lets
+- Staff choose how many files are copied at the same time (1 to 10, default 4). Outcomes are
+  recorded in file order: the saved position only passes a file once every file before it is
+  done, so a restart never skips one (a file finished but not yet recorded is simply found to be
+  in place, and skipped). MEGA's driver still runs one request at a time.
+- Progress is saved as files finish, so a restart resumes where it stopped; a lease lets
   another API instance take over a crashed move. One move at a time (partial unique index).
 - A move stops if staff stop it, if another location becomes active, or after 10 files in a row
   fail (the target is probably down). Files that fail stay where they are and keep working;

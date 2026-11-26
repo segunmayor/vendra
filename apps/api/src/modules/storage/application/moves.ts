@@ -8,7 +8,9 @@ import { FileHolder, FilePurpose, Hasher, HeldFile, LocationRepository, Location
 /** How long a worker holds a move between files. A crashed worker's move is resumed after this. */
 export const MOVE_LEASE_MS = 2 * 60 * 1000;
 const BATCH = 25;
-/** In a row, without one success: the target is probably down, so the move stops instead of failing every file. */
+/** Files copied at the same time, at most. Each holds its file in memory while it is copied. */
+export const MAX_CONCURRENCY = 10;
+/** In a row (in file order), without one success: the target is probably down, so the move stops instead of failing every file. */
 const GIVE_UP_AFTER = 10;
 
 export interface MoveSummary {
@@ -62,7 +64,10 @@ export class StorageMoveService {
   }
 
   /** Queues a move into the active location. Files keep working throughout. */
-  async start(actor: Principal, input: { deleteOld: boolean }): Promise<MoveJob> {
+  async start(actor: Principal, input: { deleteOld: boolean; concurrency: number }): Promise<MoveJob> {
+    if (!Number.isInteger(input.concurrency) || input.concurrency < 1 || input.concurrency > MAX_CONCURRENCY) {
+      throw new DomainError('storage.invalid', `Files at a time must be a whole number from 1 to ${MAX_CONCURRENCY}`);
+    }
     const summary = await this.summary();
     const target = summary.activeId ? await this.locations.find(summary.activeId) : null;
     if (!target) throw new DomainError('storage.no_active_location', 'New files are kept in the database. Make a storage location active first, then move files into it.');
@@ -70,8 +75,8 @@ export class StorageMoveService {
     if (total === 0) throw new DomainError('storage.nothing_to_move', `Every file is already in ${target.name}.`);
     const id = this.ids.uuid();
     const created = await this.moves.create(
-      { id, targetLocationId: target.id, deleteOld: input.deleteOld, total, createdBy: actor.accountId },
-      { actorId: actor.accountId, action: 'storage.move_started', targetType: 'storage_move', targetId: id, after: { target: target.name, deleteOld: input.deleteOld, total } },
+      { id, targetLocationId: target.id, deleteOld: input.deleteOld, concurrency: input.concurrency, total, createdBy: actor.accountId },
+      { actorId: actor.accountId, action: 'storage.move_started', targetType: 'storage_move', targetId: id, after: { target: target.name, deleteOld: input.deleteOld, concurrency: input.concurrency, total } },
     );
     if (!created) throw new DomainError('storage.move_running', 'Files are already being moved. Wait for that to finish, or stop it.');
     return this.get(id);
@@ -83,6 +88,13 @@ export class StorageMoveService {
     if (!stopped) throw new DomainError('storage.move_finished', 'This move has already finished.');
     return this.get(id);
   }
+}
+
+interface RunState {
+  counts: { moved: number; skipped: number; failed: number; movedBytes: number };
+  cursor: MoveCursor;
+  failuresInARow: number;
+  lastProblem: string | null;
 }
 
 type Outcome = { kind: 'moved'; bytes: number } | { kind: 'skipped' } | { kind: 'failed'; message: string };
@@ -103,48 +115,90 @@ export class StorageMoveRunner {
   async runOnce(): Promise<boolean> {
     const job = await this.moves.claim(this.clock.now(), MOVE_LEASE_MS);
     if (!job) return false;
-    let counts = { moved: job.moved, skipped: job.skipped, failed: job.failed, movedBytes: job.movedBytes };
-    let cursor: MoveCursor = job.cursor;
-    let failuresInARow = 0;
+    const state: RunState = {
+      counts: { moved: job.moved, skipped: job.skipped, failed: job.failed, movedBytes: job.movedBytes },
+      cursor: job.cursor,
+      failuresInARow: 0,
+      lastProblem: null,
+    };
     const holders = this.holders.all();
 
-    while (cursor.holder < holders.length) {
+    while (state.cursor.holder < holders.length) {
       const target = await this.locations.find(job.targetLocationId);
       if (!target || !target.active) {
         await this.moves.finish(job.id, 'cancelled', 'Stopped because another place was chosen for new files. Start a new move to continue.', this.clock.now());
         return true;
       }
-      const holder = holders[cursor.holder]!;
-      const batch = await holder.scan(cursor.after, BATCH);
+      const holder = holders[state.cursor.holder]!;
+      const batch = await holder.scan(state.cursor.after, Math.max(BATCH, job.concurrency * 5));
       if (batch.length === 0) {
-        cursor = { holder: cursor.holder + 1, after: null };
-        if (!(await this.moves.progress(job.id, { ...counts, cursor }, this.leaseUntil()))) return true;
+        state.cursor = { holder: state.cursor.holder + 1, after: null };
+        if (!(await this.moves.progress(job.id, { ...state.counts, cursor: state.cursor }, this.leaseUntil()))) return true;
         continue;
       }
-      for (const file of batch) {
-        const outcome = await this.moveOne(holder.purpose, file, target, job.deleteOld, holder);
-        cursor = { holder: cursor.holder, after: file.rowId };
-        let problem: MoveProblem | undefined;
-        if (outcome.kind === 'moved') {
-          counts = { ...counts, moved: counts.moved + 1, movedBytes: counts.movedBytes + outcome.bytes };
-          failuresInARow = 0;
-        } else if (outcome.kind === 'skipped') {
-          counts = { ...counts, skipped: counts.skipped + 1 };
-        } else {
-          counts = { ...counts, failed: counts.failed + 1 };
-          failuresInARow++;
-          problem = { at: this.clock.now(), purpose: holder.purpose, rowId: file.rowId, message: outcome.message };
-        }
-        // Saved after every file, so a restart resumes exactly here. False: staff stopped it.
-        if (!(await this.moves.progress(job.id, { ...counts, cursor, ...(problem ? { problem } : {}) }, this.leaseUntil()))) return true;
-        if (failuresInARow >= GIVE_UP_AFTER) {
-          await this.moves.finish(job.id, 'failed', `Stopped after ${GIVE_UP_AFTER} files in a row could not be moved. Last reason: ${problem?.message ?? 'unknown'}`, this.clock.now());
-          return true;
-        }
+      const result = await this.runBatch(job, holder, target, batch, state);
+      if (result === 'stopped') return true;
+      if (result === 'gave-up') {
+        await this.moves.finish(job.id, 'failed', `Stopped after ${GIVE_UP_AFTER} files in a row could not be moved. Last reason: ${state.lastProblem ?? 'unknown'}`, this.clock.now());
+        return true;
       }
     }
-    await this.moves.finish(job.id, 'completed', counts.failed > 0 ? `${counts.failed} files could not be moved. They still work where they are; start another move to retry them.` : null, this.clock.now());
+    const { failed } = state.counts;
+    await this.moves.finish(job.id, 'completed', failed > 0 ? `${failed} files could not be moved. They still work where they are; start another move to retry them.` : null, this.clock.now());
     return true;
+  }
+
+  /**
+   * Moves a batch with up to `job.concurrency` files in flight. Outcomes are recorded in file
+   * order: the saved position only passes a file once every file before it is done, so a restart
+   * never skips one. Files finished out of order wait for the ones before them.
+   */
+  private async runBatch(job: MoveJob, holder: FileHolder, target: LocationState, batch: readonly HeldFile[], state: RunState): Promise<'continue' | 'stopped' | 'gave-up'> {
+    const outcomes: (Outcome | undefined)[] = new Array(batch.length);
+    let next = 0;
+    let recorded = 0;
+    let stop: 'stopped' | 'gave-up' | null = null;
+    let saving: Promise<void> = Promise.resolve();
+
+    const record = async (): Promise<void> => {
+      const problems: MoveProblem[] = [];
+      const from = recorded;
+      while (recorded < batch.length && outcomes[recorded] && !stop) {
+        const outcome = outcomes[recorded]!;
+        const file = batch[recorded]!;
+        recorded++;
+        if (outcome.kind === 'moved') {
+          state.counts = { ...state.counts, moved: state.counts.moved + 1, movedBytes: state.counts.movedBytes + outcome.bytes };
+          state.failuresInARow = 0;
+        } else if (outcome.kind === 'skipped') {
+          state.counts = { ...state.counts, skipped: state.counts.skipped + 1 };
+        } else {
+          state.counts = { ...state.counts, failed: state.counts.failed + 1 };
+          state.failuresInARow++;
+          state.lastProblem = outcome.message;
+          problems.unshift({ at: this.clock.now(), purpose: holder.purpose, rowId: file.rowId, message: outcome.message });
+        }
+        if (state.failuresInARow >= GIVE_UP_AFTER) stop = 'gave-up';
+      }
+      if (recorded === from) return;
+      state.cursor = { holder: state.cursor.holder, after: batch[recorded - 1]!.rowId };
+      // False: staff stopped the move.
+      const running = await this.moves.progress(job.id, { ...state.counts, cursor: state.cursor, ...(problems.length ? { problems } : {}) }, this.leaseUntil());
+      if (!running) stop = 'stopped';
+    };
+
+    const worker = async (): Promise<void> => {
+      while (!stop && next < batch.length) {
+        const index = next++;
+        outcomes[index] = await this.moveOne(holder.purpose, batch[index]!, target, job.deleteOld, holder);
+        // One save at a time, in order.
+        saving = saving.then(record);
+        await saving;
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(job.concurrency, batch.length) }, worker));
+    await saving;
+    return stop ?? 'continue';
   }
 
   private leaseUntil(): Date {

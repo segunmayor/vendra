@@ -2269,6 +2269,8 @@ export interface components {
             /** @enum {string} */
             status: "queued" | "running" | "completed" | "cancelled" | "failed";
             deleteOld: boolean;
+            /** @description Files copied at the same time */
+            concurrency: number;
             /** @description Files that needed moving when the move started */
             total: number;
             moved: number;
@@ -2301,6 +2303,11 @@ export interface components {
              * @default true
              */
             deleteOld: boolean;
+            /**
+             * @description Files copied at the same time
+             * @default 4
+             */
+            concurrency: number;
         };
         MoneyResponse: {
             /**

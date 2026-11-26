@@ -1,4 +1,4 @@
-import { ActionForm, Alert, Badge, Card, EmptyState, PageHeader, SubmitButton, Table, Td, type Tone } from '@vendra/ui';
+import { ActionForm, Alert, Badge, Card, EmptyState, Field, PageHeader, Select, SubmitButton, Table, Td, type Tone } from '@vendra/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AutoRefresh } from '../../../../../lib/auto-refresh';
@@ -69,7 +69,7 @@ export default async function MoveFilesPage() {
               <div className="mb-2 flex flex-wrap items-center gap-3">
                 <Badge tone={STATUS[running.status]?.tone ?? 'neutral'}>{STATUS[running.status]?.label ?? running.status}</Badge>
                 <span className="text-sm text-muted">
-                  {done} of {running.total} files · {running.moved} moved · {size(running.movedBytes)}
+                  {done} of {running.total} files · {running.moved} moved · {size(running.movedBytes)} · {running.concurrency} at a time
                   {running.failed ? ` · ${running.failed} could not be moved` : ''}
                 </span>
               </div>
@@ -87,6 +87,19 @@ export default async function MoveFilesPage() {
             <p className="mt-6 border-t border-border pt-4 text-sm text-muted">Every file is already in {active.name}.</p>
           ) : (
             <ActionForm action={startMove} className="mt-6 space-y-4 border-t border-border pt-4">
+              <Field
+                label="Files at a time"
+                hint="More is faster, but uses more of the server’s memory and connection while it runs. MEGA always takes one at a time."
+                className="max-w-xs"
+              >
+                <Select name="concurrency" defaultValue="4">
+                  {[1, 2, 3, 4, 5, 6, 8, 10].map((count) => (
+                    <option key={count} value={count}>
+                      {count === 1 ? '1 (gentlest)' : count === 10 ? '10 (fastest)' : count}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
               <label className="flex items-start gap-3 text-sm">
                 <input type="checkbox" name="deleteOld" defaultChecked className="mt-0.5 size-5" />
                 <span>
@@ -142,7 +155,10 @@ export default async function MoveFilesPage() {
                   </details>
                 ) : null}
               </Td>
-              <Td className="text-sm">{move.deleteOld ? 'Deleted' : 'Kept'}</Td>
+              <Td className="text-sm">
+                {move.deleteOld ? 'Deleted' : 'Kept'}
+                <div className="text-xs text-muted">{move.concurrency} at a time</div>
+              </Td>
             </tr>
           ))}
         </Table>

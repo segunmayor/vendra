@@ -945,17 +945,17 @@ model StorageLocation {
 
 /// One file written to a storage location. Rows are never moved: a file is read from where it was written.
 model StorageObject {
-  id          String          @id @db.Uuid
-  locationId  String          @db.Uuid
-  key         String
-  contentType String
-  sizeBytes   Int
-  sha256      String
-  purpose     String
-  createdAt   DateTime        @default(now()) @db.Timestamptz
+  id           String          @id @db.Uuid
+  locationId   String          @db.Uuid
+  key          String
+  contentType  String
+  sizeBytes    Int
+  sha256       String
+  purpose      String
+  createdAt    DateTime        @default(now()) @db.Timestamptz
   /// Set when a move gave the file a new copy elsewhere and this one was kept. No record points here any more.
-  supersededAt DateTime?      @db.Timestamptz
-  location    StorageLocation @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  supersededAt DateTime?       @db.Timestamptz
+  location     StorageLocation @relation(fields: [locationId], references: [id], onDelete: Restrict)
 
   @@unique([locationId, key])
   @@index([locationId])
@@ -972,6 +972,8 @@ model StorageMoveJob {
   status           String
   /// Delete the copy in the old storage location once a file is moved. Bytes in the database are always cleared.
   deleteOld        Boolean
+  /// Files copied at the same time, 1 to 10.
+  concurrency      Int       @default(1)
   total            Int
   moved            Int       @default(0)
   skipped          Int       @default(0)

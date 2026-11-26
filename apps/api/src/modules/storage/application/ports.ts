@@ -118,6 +118,8 @@ export interface MoveJob {
   readonly targetLocationId: string;
   readonly status: MoveStatus;
   readonly deleteOld: boolean;
+  /** Files copied at the same time. */
+  readonly concurrency: number;
   readonly total: number;
   readonly moved: number;
   readonly skipped: number;
@@ -138,12 +140,13 @@ export interface MoveProgress {
   readonly failed: number;
   readonly movedBytes: number;
   readonly cursor: MoveCursor;
-  readonly problem?: MoveProblem;
+  /** New problems since the last save, newest first. */
+  readonly problems?: readonly MoveProblem[];
 }
 
 export interface MoveRepository {
   /** False if a move is already queued or running. */
-  create(job: Pick<MoveJob, 'id' | 'targetLocationId' | 'deleteOld' | 'total' | 'createdBy'>, audit: AuditEntry): Promise<boolean>;
+  create(job: Pick<MoveJob, 'id' | 'targetLocationId' | 'deleteOld' | 'concurrency' | 'total' | 'createdBy'>, audit: AuditEntry): Promise<boolean>;
   find(id: string): Promise<MoveJob | null>;
   recent(limit: number): Promise<MoveJob[]>;
   /** Takes a queued job, or a running one whose worker stopped renewing its lease. */

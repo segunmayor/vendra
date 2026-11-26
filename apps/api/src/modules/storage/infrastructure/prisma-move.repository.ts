@@ -12,6 +12,7 @@ const toJob = (row: Row): MoveJob => ({
   targetLocationId: row.targetLocationId,
   status: row.status as MoveStatus,
   deleteOld: row.deleteOld,
+  concurrency: row.concurrency,
   total: row.total,
   moved: row.moved,
   skipped: row.skipped,
@@ -29,7 +30,7 @@ const toJob = (row: Row): MoveJob => ({
 export class PrismaMoveRepository implements MoveRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async create(job: Pick<MoveJob, 'id' | 'targetLocationId' | 'deleteOld' | 'total' | 'createdBy'>, audit: AuditEntry): Promise<boolean> {
+  async create(job: Pick<MoveJob, 'id' | 'targetLocationId' | 'deleteOld' | 'concurrency' | 'total' | 'createdBy'>, audit: AuditEntry): Promise<boolean> {
     try {
       await this.prisma.$transaction(async (tx) => {
         await tx.storageMoveJob.create({ data: { ...job, status: 'queued' } });
@@ -71,7 +72,8 @@ export class PrismaMoveRepository implements MoveRepository {
     return this.prisma.$transaction(async (tx) => {
       const row = await tx.storageMoveJob.findUnique({ where: { id }, select: { status: true, problems: true } });
       if (!row || row.status !== 'running') return false;
-      const problems = progress.problem ? [{ ...progress.problem, at: progress.problem.at.toISOString() }, ...(row.problems as unknown[])].slice(0, MAX_PROBLEMS) : undefined;
+      const fresh = (progress.problems ?? []).map((problem) => ({ ...problem, at: problem.at.toISOString() }));
+      const problems = fresh.length ? [...fresh, ...(row.problems as unknown[])].slice(0, MAX_PROBLEMS) : undefined;
       const { count } = await tx.storageMoveJob.updateMany({
         where: { id, status: 'running' },
         data: {
