@@ -18,6 +18,8 @@ export interface ProductState {
   readonly slug: string;
   readonly description: string;
   readonly attributes: Readonly<Record<string, AttributeValue>>;
+  /** Photo addresses in display order; the first is the main photo. */
+  readonly images: readonly string[];
   readonly status: ProductStatus;
   readonly variants: readonly Variant[];
   readonly version: number;
@@ -33,6 +35,9 @@ export interface ProductDetails {
 const SKU = /^[A-Z0-9][A-Z0-9._-]{1,63}$/;
 const MAX_DESCRIPTION = 5000;
 const MAX_VARIANTS = 100;
+export const MAX_IMAGES = 10;
+/** A photo Vendra stores (see ProductMediaService), or an https address on another host. */
+const IMAGE = /^(?:\/media\/[0-9a-f-]{36}\.(?:jpg|png|gif|webp|avif)|https:\/\/[^\s"'<>]{4,2000})$/;
 
 function assertDescription(description: string): string {
   if (description.length > MAX_DESCRIPTION) {
@@ -59,6 +64,7 @@ export class Product extends AggregateRoot {
       slug: toSlug(input.slug || name),
       description: assertDescription(input.description),
       attributes: validateAttributes(definitions, input.attributes, false),
+      images: [],
       status: 'draft',
       variants: [],
       version: 0,
@@ -117,6 +123,17 @@ export class Product extends AggregateRoot {
     this.state = { ...this.state, variants: [...this.state.variants, variant] };
     if (this.state.status === 'published') this.emit('ProductUpdated', now);
     return variant;
+  }
+
+  /** Replaces the photos. The order given is the display order. */
+  setImages(images: readonly string[], now: Date): void {
+    const unique = [...new Set(images)];
+    if (unique.length > MAX_IMAGES) throw new DomainError('product.too_many_images', `A product can have at most ${MAX_IMAGES} photos`);
+    const bad = unique.find((image) => !IMAGE.test(image));
+    if (bad !== undefined) throw new DomainError('product.invalid_image', 'Photos must be uploaded to Vendra or be https addresses');
+    if (unique.length === this.state.images.length && unique.every((image, index) => image === this.state.images[index])) return;
+    this.state = { ...this.state, images: unique };
+    if (this.state.status === 'published') this.emit('ProductUpdated', now);
   }
 
   /** Re-checks attributes, because the category's definitions may have changed since they were entered. */

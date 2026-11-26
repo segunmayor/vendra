@@ -5,12 +5,23 @@ import type { Availability, ProductCard as Card } from '../lib/catalogue';
 
 type Money = Card['priceFrom'];
 
-export function Price({ from, to, className }: { from: Money; to: Money; className?: string }) {
+export function Price({ from, to, compareAt, className }: { from: Money; to: Money; compareAt?: Money | null; className?: string }) {
   const same = from.amountMinor === to.amountMinor;
   return (
     <span className={cn('font-bold tabular-nums', className)}>
       {same ? formatMoney(from.amountMinor, from.currency) : <>From {formatMoney(from.amountMinor, from.currency)}</>}
+      {compareAt ? <WasPrice value={compareAt} className="ml-2 text-sm" /> : null}
     </span>
+  );
+}
+
+/** The usual price, crossed out, beside a discounted one. */
+export function WasPrice({ value, className }: { value: Money; className?: string }) {
+  return (
+    <s className={cn('font-normal text-muted tabular-nums', className)}>
+      <span className="sr-only">Was </span>
+      {formatMoney(value.amountMinor, value.currency)}
+    </s>
   );
 }
 
@@ -54,7 +65,7 @@ export function ProductCard({ product }: { product: Card }) {
         <div className="mt-3 space-y-1">
           {product.brand ? <div className="text-xs font-medium tracking-wide text-muted uppercase">{product.brand.name}</div> : null}
           <h3 className="line-clamp-2 text-sm font-semibold group-hover:underline">{product.name}</h3>
-          <Price from={product.priceFrom} to={product.priceTo} className="block text-base" />
+          <Price from={product.priceFrom} to={product.priceTo} compareAt={product.compareAt} className="block text-base" />
           {product.availability !== 'in_stock' ? <AvailabilityBadge availability={product.availability} /> : null}
         </div>
       </Link>

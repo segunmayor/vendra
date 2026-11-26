@@ -17,6 +17,7 @@ import {
   updateProduct,
 } from '../actions';
 import { AttributeFields } from '../attribute-fields';
+import { Photos } from '../photos';
 
 export const metadata: Metadata = { title: 'Product' };
 
@@ -27,6 +28,9 @@ const REASONS = [
   { value: 'damaged', label: 'Damaged' },
   { value: 'lost', label: 'Lost' },
 ] as const;
+
+/** Whole-number discount, rounded down, for the label under a discounted price. */
+const discountPercent = (priceMinor: string, wasMinor: string) => Number(((BigInt(wasMinor) - BigInt(priceMinor)) * 100n) / BigInt(wasMinor));
 
 /** Shows naira without the kobo when there are none, for the price input. */
 const nairaInput = (minor: string) => (minor.endsWith('00') ? minor.slice(0, -2) || '0' : `${minor.slice(0, -2) || '0'}.${minor.slice(-2)}`);
@@ -93,6 +97,10 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         </div>
       ) : null}
 
+      <section aria-labelledby="photos" className="mb-6">
+        <Photos productId={product.id} images={product.images} published={product.status === 'published'} />
+      </section>
+
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
         <section aria-labelledby="variants" className="space-y-4">
           <h2 id="variants" className="text-lg font-semibold">
@@ -121,12 +129,21 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                   <div className="mt-4 flex flex-wrap items-end gap-4 border-t border-border pt-4">
                     <div>
                       <div className="text-xs text-muted">Price</div>
-                      <div className="text-lg font-semibold">{formatMoney(listing.price.amountMinor, listing.price.currency)}</div>
+                      <div className="text-lg font-semibold">
+                        {formatMoney(listing.price.amountMinor, listing.price.currency)}
+                        {listing.compareAt ? (
+                          <s className="ml-2 text-sm font-normal text-muted">{formatMoney(listing.compareAt.amountMinor, listing.compareAt.currency)}</s>
+                        ) : null}
+                      </div>
+                      {listing.compareAt ? <div className="text-xs text-muted">{discountPercent(listing.price.amountMinor, listing.compareAt.amountMinor)}% off</div> : null}
                     </div>
                     <Badge tone={LISTING_TONE[listing.status]}>{listing.status === 'active' ? 'on sale' : listing.status}</Badge>
                     <ActionForm action={setListingPrice.bind(null, product.id, listing.id)} className="flex items-end gap-2">
                       <Field label="New price (₦)">
                         <Input name="price" inputMode="decimal" defaultValue={nairaInput(listing.price.amountMinor)} className="w-36" required />
+                      </Field>
+                      <Field label="Was-price (₦)">
+                        <Input name="wasPrice" inputMode="decimal" defaultValue={listing.compareAt ? nairaInput(listing.compareAt.amountMinor) : ''} placeholder="Optional" className="w-36" />
                       </Field>
                       <SubmitButton size="sm" variant="outline">
                         Update price
@@ -142,6 +159,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                   <ActionForm action={createListing.bind(null, product.id, variant.id)} className="mt-4 flex items-end gap-2 border-t border-border pt-4">
                     <Field label="Price (₦)">
                       <Input name="price" inputMode="decimal" placeholder="15,000" className="w-36" required />
+                    </Field>
+                    <Field label="Was-price (₦)">
+                      <Input name="wasPrice" inputMode="decimal" placeholder="Optional" className="w-36" />
                     </Field>
                     <SubmitButton size="sm">Set price</SubmitButton>
                   </ActionForm>

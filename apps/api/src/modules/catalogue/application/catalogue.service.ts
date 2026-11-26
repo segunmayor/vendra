@@ -1,6 +1,6 @@
-import { ApplicationError, AuditEntry, Principal } from '../../../shared-kernel';
+import { ApplicationError, AuditEntry, DomainError, Principal } from '../../../shared-kernel';
 import { assertName, parseAttributeSchema, toSlug } from '../domain/attributes';
-import { Product, ProductDetails, ProductState, ProductStatus, Variant } from '../domain/product';
+import { MAX_IMAGES, Product, ProductDetails, ProductState, ProductStatus, Variant } from '../domain/product';
 import {
   BrandRepository,
   BrandView,
@@ -11,6 +11,8 @@ import {
   ProductRepository,
   ProductSummary,
 } from './ports';
+
+export { MAX_IMAGES };
 
 const notFound = (what: string) => new ApplicationError('not_found', `${what}.not_found`, `${what[0]?.toUpperCase()}${what.slice(1)} not found`);
 
@@ -73,6 +75,51 @@ export class CatalogueService {
 
   async getProduct(id: string): Promise<ProductState> {
     return (await this.load(id)).snapshot;
+  }
+
+  async findProductBySlug(slug: string): Promise<ProductState | null> {
+    return (await this.products.findBySlug(slug))?.snapshot ?? null;
+  }
+
+  /** Which product already uses each SKU, so an import can tell a clash from its own variant. */
+  skuOwners(skus: readonly string[]): Promise<Map<string, string>> {
+    return this.products.skuOwners(skus.map((sku) => sku.trim().toUpperCase()));
+  }
+
+  /** Refuses before a photo is downloaded or stored when the product already has the most allowed. */
+  async assertRoomForImage(id: string): Promise<void> {
+    const product = await this.load(id);
+    if (product.snapshot.images.length >= MAX_IMAGES) {
+      throw new DomainError('product.too_many_images', `A product can have at most ${MAX_IMAGES} photos. Remove one first.`);
+    }
+  }
+
+  /** Adds a photo after the others. A photo the product already has is left where it is. */
+  async addImage(actor: Principal, id: string, image: string): Promise<ProductState> {
+    const product = await this.load(id);
+    return this.setImages(actor, id, [...product.snapshot.images, image]);
+  }
+
+  /** Reorders or removes photos. Only photos the product already has may be listed. */
+  async arrangeImages(actor: Principal, id: string, images: readonly string[]): Promise<ProductState> {
+    const product = await this.load(id);
+    const current = new Set(product.snapshot.images);
+    if (images.some((image) => !current.has(image))) {
+      throw new DomainError('product.unknown_image', 'The photos changed while you were editing. Reload the page and try again.');
+    }
+    return this.setImages(actor, id, images);
+  }
+
+  async setImages(actor: Principal, id: string, images: readonly string[]): Promise<ProductState> {
+    const product = await this.load(id);
+    const before = product.snapshot.images;
+    product.setImages(images, this.clock.now());
+    if (product.snapshot.images === before) return product.snapshot;
+    await this.products.save(
+      product,
+      this.audit(actor, 'catalogue.product_images_set', 'product', id, { images: [...product.snapshot.images] }, { images: [...before] }),
+    );
+    return product.snapshot;
   }
 
   async createProduct(

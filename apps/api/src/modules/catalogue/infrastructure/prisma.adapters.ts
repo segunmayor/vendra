@@ -111,6 +111,7 @@ const toProduct = (row: ProductRow): Product =>
     slug: row.slug,
     description: row.description,
     attributes: row.attributes as Record<string, AttributeValue>,
+    images: Array.isArray(row.images) ? row.images.filter((image): image is string => typeof image === 'string') : [],
     status: row.status as ProductStatus,
     version: row.version,
     variants: row.variants.map((variant) => ({
@@ -127,6 +128,17 @@ export class PrismaProductRepository implements ProductRepository {
   async findById(id: string): Promise<Product | null> {
     const row = await this.prisma.product.findUnique({ where: { id }, include: productInclude });
     return row ? toProduct(row) : null;
+  }
+
+  async findBySlug(slug: string): Promise<Product | null> {
+    const row = await this.prisma.product.findUnique({ where: { slug }, include: productInclude });
+    return row ? toProduct(row) : null;
+  }
+
+  async skuOwners(skus: readonly string[]): Promise<Map<string, string>> {
+    if (skus.length === 0) return new Map();
+    const rows = await this.prisma.productVariant.findMany({ where: { sku: { in: [...skus] } }, select: { sku: true, productId: true } });
+    return new Map(rows.map((row) => [row.sku, row.productId]));
   }
 
   async findVariant(id: string): Promise<VariantSummary | null> {
@@ -179,6 +191,7 @@ export class PrismaProductRepository implements ProductRepository {
       description: state.description,
       brandId: state.brandId,
       attributes: json(state.attributes),
+      images: json(state.images),
       status: state.status,
     };
     const variantRows = state.variants.map((variant) => ({

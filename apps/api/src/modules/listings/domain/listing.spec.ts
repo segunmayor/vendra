@@ -41,3 +41,35 @@ describe('Listing', () => {
     expect(listing.pullEvents().map((e) => e.type)).toEqual(['ListingActivated', 'ListingDeactivated']);
   });
 });
+
+describe('Listing discounts', () => {
+  const withDiscount = () => Listing.create({ id: 'l', variantId: 'v', sellerId: 's', price: ngn(1_200_000n), compareAt: ngn(1_500_000n) });
+
+  it('keeps a usual price above the selling price', () => {
+    expect(withDiscount().snapshot.compareAt?.minor).toBe(1_500_000n);
+  });
+
+  it.each([1_200_000n, 1_000_000n])('rejects a usual price of %s, not above the price', (minor) => {
+    expect(() => Listing.create({ id: 'l', variantId: 'v', sellerId: 's', price: ngn(1_200_000n), compareAt: ngn(minor) })).toThrow('higher');
+  });
+
+  it('keeps the usual price when only the price changes, and checks it still applies', () => {
+    const listing = withDiscount();
+    listing.changePrice(ngn(1_100_000n), now);
+    expect(listing.snapshot.compareAt?.minor).toBe(1_500_000n);
+    expect(() => listing.changePrice(ngn(1_600_000n), now)).toThrow('higher');
+  });
+
+  it('removes a discount with null, and records it', () => {
+    const listing = withDiscount();
+    listing.changePrice(ngn(1_200_000n), now, null);
+    expect(listing.snapshot.compareAt).toBeNull();
+    expect(listing.pullEvents()[0]?.payload).toMatchObject({ compareAtMinor: null });
+  });
+
+  it('treats the same price and usual price as no change', () => {
+    const listing = withDiscount();
+    listing.changePrice(ngn(1_200_000n), now, ngn(1_500_000n));
+    expect(listing.pullEvents()).toHaveLength(0);
+  });
+});

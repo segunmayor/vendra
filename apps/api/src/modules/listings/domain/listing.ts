@@ -8,6 +8,8 @@ export interface ListingState {
   readonly variantId: string;
   readonly sellerId: string;
   readonly price: Money;
+  /** The usual price, shown struck through. Always above `price`, in the same currency. Null: no discount. */
+  readonly compareAt: Money | null;
   readonly status: ListingStatus;
   readonly version: number;
 }
@@ -16,14 +18,26 @@ function assertPrice(price: Money): void {
   if (!price.isPositive()) throw new DomainError('listing.invalid_price', 'Price must be more than zero');
 }
 
+function assertCompareAt(price: Money, compareAt: Money | null): void {
+  if (!compareAt) return;
+  if (compareAt.currency !== price.currency) {
+    throw new DomainError('listing.invalid_compare_at', 'The usual price must be in the same currency as the price');
+  }
+  if (!compareAt.isGreaterThan(price)) {
+    throw new DomainError('listing.invalid_compare_at', 'The usual price must be higher than the selling price, or left empty');
+  }
+}
+
 export class Listing extends AggregateRoot {
   private constructor(private state: ListingState) {
     super();
   }
 
-  static create(input: { id: string; variantId: string; sellerId: string; price: Money }): Listing {
+  static create(input: { id: string; variantId: string; sellerId: string; price: Money; compareAt?: Money | null }): Listing {
     assertPrice(input.price);
-    return new Listing({ ...input, status: 'draft', version: 0 });
+    const compareAt = input.compareAt ?? null;
+    assertCompareAt(input.price, compareAt);
+    return new Listing({ ...input, compareAt, status: 'draft', version: 0 });
   }
 
   static rehydrate(state: ListingState): Listing {
@@ -38,17 +52,25 @@ export class Listing extends AggregateRoot {
     this.state = { ...this.state, version: this.state.version + 1 };
   }
 
-  changePrice(price: Money, now: Date): void {
+  /**
+   * Sets the selling price and, unless `compareAt` is undefined (keep it), the usual price.
+   * Pass null to remove a discount.
+   */
+  changePrice(price: Money, now: Date, compareAt?: Money | null): void {
     assertPrice(price);
     if (price.currency !== this.state.price.currency) {
       throw new DomainError('listing.currency_change', 'A listing cannot change currency');
     }
-    if (price.equals(this.state.price)) return;
+    const nextCompareAt = compareAt === undefined ? this.state.compareAt : compareAt;
+    assertCompareAt(price, nextCompareAt);
+    const sameCompareAt = nextCompareAt === null ? this.state.compareAt === null : !!this.state.compareAt?.equals(nextCompareAt);
+    if (price.equals(this.state.price) && sameCompareAt) return;
     const previous = this.state.price;
-    this.state = { ...this.state, price };
+    this.state = { ...this.state, price, compareAt: nextCompareAt };
     this.emit('ListingPriceChanged', now, {
       previousMinor: previous.minor.toString(),
       priceMinor: price.minor.toString(),
+      compareAtMinor: nextCompareAt?.minor.toString() ?? null,
       currency: price.currency,
     });
   }

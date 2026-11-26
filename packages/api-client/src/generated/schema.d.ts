@@ -668,6 +668,228 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/products/{id}/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder or remove photos. The first is the main photo. */
+        put: operations["adminArrangeProductImages"];
+        /** Add a photo from the computer, after the others */
+        post: operations["adminUploadProductImage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/products/{id}/images/from-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Download a photo from a web address and add it after the others */
+        post: operations["adminAddProductImageFromUrl"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store/media/{file}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A product photo, by the file name in a product image address */
+        get: operations["storeGetMedia"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/storage/types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The storage services Vendra can use, and the settings each needs */
+        get: operations["adminStorageTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/storage/locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminStorageOverview"];
+        put?: never;
+        /** Adds a location. It is not used until it is made active. */
+        post: operations["adminCreateStorageLocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/storage/locations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminGetStorageLocation"];
+        /** For the active location, the new settings must pass a check first */
+        put: operations["adminUpdateStorageLocation"];
+        post?: never;
+        /** Only a location that is not active and holds no files */
+        delete: operations["adminRemoveStorageLocation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/storage/locations/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Writes, reads back and deletes a small file. The outcome is in lastCheck. */
+        post: operations["adminTestStorageLocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/storage/locations/{id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** New files go here from now on. Must pass a check first. */
+        post: operations["adminActivateStorageLocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/storage/database/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** New files are kept in the database again */
+        post: operations["adminUseDatabaseStorage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/storage/moves/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What is not yet in the active location, and any move in progress */
+        get: operations["adminStorageMoveSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/storage/moves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminListStorageMoves"];
+        put?: never;
+        /** Moves every file not yet in the active location into it, in the background */
+        post: operations["adminStartStorageMove"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/storage/moves/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminGetStorageMove"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/storage/moves/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stops after the current file. Files already moved stay moved. */
+        post: operations["adminCancelStorageMove"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/listings": {
         parameters: {
             query?: never;
@@ -1556,6 +1778,141 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/product-imports/columns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every column a product file may have */
+        get: operations["adminImportColumns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/product-imports/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A CSV template with example rows */
+        get: operations["adminImportTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/product-imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminListImports"];
+        put?: never;
+        /** Check a product file. Nothing is created until the import is started. */
+        post: operations["adminUploadImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/product-imports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminGetImport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/product-imports/{id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Products in the file, in file order, with what happened to each */
+        get: operations["adminListImportItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/product-imports/{id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every problem and warning as CSV, to fix in a spreadsheet */
+        get: operations["adminImportReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/product-imports/{id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import the products that passed the checks */
+        post: operations["adminStartImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/product-imports/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop before the next product. Products already imported stay. */
+        post: operations["adminCancelImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1790,6 +2147,8 @@ export interface components {
             /** @enum {string} */
             status: "draft" | "published" | "archived";
             variants: components["schemas"]["VariantResponse"][];
+            /** @description Photo addresses in display order; the first is the main photo. /media/... addresses are served by each portal. */
+            images: string[];
             version: number;
         };
         ProductDetailsDto: {
@@ -1807,6 +2166,142 @@ export interface components {
                 [key: string]: string;
             };
         };
+        UploadPhotoDto: {
+            /**
+             * Format: binary
+             * @description A JPEG, PNG, GIF, WebP or AVIF photo
+             */
+            file: string;
+        };
+        PhotoFromUrlDto: {
+            /** @description A direct https:// link to the photo file */
+            url: string;
+        };
+        ArrangePhotosDto: {
+            /** @description The photos to keep, in display order. Only photos the product already has. */
+            images: string[];
+        };
+        FieldSpecResponse: {
+            key: string;
+            label: string;
+            help: string;
+            required: boolean;
+            default?: string;
+            placeholder?: string;
+            /** @enum {string} */
+            kind?: "text" | "url" | "boolean" | "email";
+        };
+        StorageTypeResponse: {
+            type: string;
+            label: string;
+            description: string;
+            config: components["schemas"]["FieldSpecResponse"][];
+            /** @description Never returned once saved; see secretHints */
+            credentials: components["schemas"]["FieldSpecResponse"][];
+        };
+        CheckResponse: {
+            /** Format: date-time */
+            at: string;
+            ok: boolean;
+            message?: string | null;
+        };
+        UsageResponse: {
+            files: number;
+            bytes: number;
+        };
+        StorageLocationResponse: {
+            id: string;
+            type: string;
+            name: string;
+            config: {
+                [key: string]: string;
+            };
+            /** @description Last four characters of each saved credential */
+            secretHints: {
+                [key: string]: string;
+            };
+            active: boolean;
+            lastCheck?: components["schemas"]["CheckResponse"] | null;
+            version: number;
+            usage?: components["schemas"]["UsageResponse"];
+        };
+        StorageOverviewResponse: {
+            /** @description Null while new files are kept in the database */
+            activeId?: string | null;
+            locations: components["schemas"]["StorageLocationResponse"][];
+        };
+        CreateLocationDto: {
+            name: string;
+            config: {
+                [key: string]: string;
+            };
+            /** @description Blank or missing fields keep the saved value */
+            credentials: {
+                [key: string]: string;
+            };
+            type: string;
+        };
+        LocationInputDto: {
+            name: string;
+            config: {
+                [key: string]: string;
+            };
+            /** @description Blank or missing fields keep the saved value */
+            credentials: {
+                [key: string]: string;
+            };
+        };
+        SizeResponse: {
+            files: number;
+            bytes: number;
+        };
+        MoveProblemResponse: {
+            /** Format: date-time */
+            at: string;
+            /** @enum {string} */
+            purpose: "product-media" | "seller-documents";
+            rowId: string;
+            message: string;
+        };
+        MoveJobResponse: {
+            id: string;
+            targetLocationId: string;
+            /** @enum {string} */
+            status: "queued" | "running" | "completed" | "cancelled" | "failed";
+            deleteOld: boolean;
+            /** @description Files that needed moving when the move started */
+            total: number;
+            moved: number;
+            /** @description Already there, or changed while being moved */
+            skipped: number;
+            /** @description Left where they were; they still work */
+            failed: number;
+            movedBytes: number;
+            /** @description The latest problems, newest first */
+            problems: components["schemas"]["MoveProblemResponse"][];
+            message?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            startedAt?: string | null;
+            /** Format: date-time */
+            finishedAt?: string | null;
+        };
+        MoveSummaryResponse: {
+            activeId?: string | null;
+            /** @description Files still in this server’s database */
+            database: components["schemas"]["SizeResponse"];
+            /** @description Files in storage locations other than the active one */
+            otherLocations: components["schemas"]["SizeResponse"];
+            running?: components["schemas"]["MoveJobResponse"] | null;
+        };
+        StartMoveDto: {
+            /**
+             * @description Delete the copy in an earlier storage location once a file is moved. Files in the database are always cleared from it.
+             * @default true
+             */
+            deleteOld: boolean;
+        };
         MoneyResponse: {
             /**
              * @description Integer minor units (kobo), as a string
@@ -1821,6 +2316,8 @@ export interface components {
             variantId: string;
             sellerId: string;
             price: components["schemas"]["MoneyResponse"];
+            /** @description The usual price, shown struck through */
+            compareAt?: components["schemas"]["MoneyResponse"] | null;
             /** @enum {string} */
             status: "draft" | "active" | "inactive";
             version: number;
@@ -1830,6 +2327,11 @@ export interface components {
             priceMinor: string;
             /** @example NGN */
             currency: string;
+            /**
+             * @description The usual price. Omit to keep it, null to remove the discount.
+             * @example 1800000
+             */
+            compareAtMinor?: string | null;
             variantId: string;
         };
         PriceDto: {
@@ -1837,6 +2339,11 @@ export interface components {
             priceMinor: string;
             /** @example NGN */
             currency: string;
+            /**
+             * @description The usual price. Omit to keep it, null to remove the discount.
+             * @example 1800000
+             */
+            compareAtMinor?: string | null;
         };
         AddressDto: {
             line1: string;
@@ -1898,6 +2405,8 @@ export interface components {
             image?: string | null;
             priceFrom: components["schemas"]["MoneyDto"];
             priceTo: components["schemas"]["MoneyDto"];
+            /** @description Usual price of the cheapest variant, when discounted */
+            compareAt?: components["schemas"]["MoneyDto"] | null;
             /** @enum {string} */
             availability: "in_stock" | "low_stock" | "out_of_stock";
         };
@@ -1913,6 +2422,8 @@ export interface components {
         OfferDto: {
             listingId: string;
             price: components["schemas"]["MoneyDto"];
+            /** @description The usual price, when discounted */
+            compareAt?: components["schemas"]["MoneyDto"] | null;
             /** @enum {string} */
             availability: "in_stock" | "low_stock" | "out_of_stock";
             /** @description Set only when stock is low */
@@ -2560,6 +3071,87 @@ export interface components {
             note?: string;
             /** @description The version you were looking at */
             version?: number;
+        };
+        ImportColumnResponse: {
+            name: string;
+            /** @enum {string} */
+            level: "product" | "variant";
+            required: boolean;
+            description: string;
+            example: string;
+            aliases: string[];
+        };
+        UploadImportDto: {
+            /**
+             * Format: binary
+             * @description A .csv file
+             */
+            file: string;
+            /**
+             * @description create_only leaves existing products alone
+             * @enum {string}
+             */
+            mode?: "create_only" | "create_and_update";
+        };
+        IssueResponse: {
+            /** @description Line in the file; 1 is the header */
+            line?: number | null;
+            field?: string | null;
+            message: string;
+        };
+        SummaryResponse: {
+            rows: number;
+            products: number;
+            variants: number;
+            creates: number;
+            updates: number;
+        };
+        CountsResponse: {
+            invalid: number;
+            ready: number;
+            skipped: number;
+            imported: number;
+            failed: number;
+        };
+        ImportJobResponse: {
+            id: string;
+            /** @enum {string} */
+            format: "csv";
+            fileName: string;
+            sizeBytes: number;
+            /** @enum {string} */
+            mode: "create_only" | "create_and_update";
+            /** @enum {string} */
+            status: "validated" | "queued" | "running" | "completed" | "cancelled";
+            /** @description Problems with the whole file. If any, the import cannot start. */
+            issues: components["schemas"]["IssueResponse"][];
+            warnings: components["schemas"]["IssueResponse"][];
+            summary: components["schemas"]["SummaryResponse"];
+            counts: components["schemas"]["CountsResponse"];
+            createdBy: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            startedAt?: string | null;
+            /** Format: date-time */
+            finishedAt?: string | null;
+        };
+        ImportItemResponse: {
+            id: string;
+            position: number;
+            handle: string;
+            name: string;
+            lines: number[];
+            skus: string[];
+            /** @enum {string} */
+            action: "create" | "update" | "skip";
+            /** @enum {string} */
+            status: "invalid" | "ready" | "skipped" | "imported" | "failed";
+            errors: components["schemas"]["IssueResponse"][];
+            warnings: components["schemas"]["IssueResponse"][];
+            productId?: string | null;
+            /** Format: date-time */
+            processedAt?: string | null;
         };
     };
     responses: never;
@@ -3598,6 +4190,396 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProductResponse"];
+                };
+            };
+        };
+    };
+    adminArrangeProductImages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArrangePhotosDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductResponse"];
+                };
+            };
+        };
+    };
+    adminUploadProductImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["UploadPhotoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductResponse"];
+                };
+            };
+        };
+    };
+    adminAddProductImageFromUrl: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhotoFromUrlDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductResponse"];
+                };
+            };
+        };
+    };
+    storeGetMedia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/gif": string;
+                    "image/webp": string;
+                    "image/avif": string;
+                };
+            };
+        };
+    };
+    adminStorageTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageTypeResponse"][];
+                };
+            };
+        };
+    };
+    adminStorageOverview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageOverviewResponse"];
+                };
+            };
+        };
+    };
+    adminCreateStorageLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLocationDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageLocationResponse"];
+                };
+            };
+        };
+    };
+    adminGetStorageLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageLocationResponse"];
+                };
+            };
+        };
+    };
+    adminUpdateStorageLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocationInputDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageLocationResponse"];
+                };
+            };
+        };
+    };
+    adminRemoveStorageLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    adminTestStorageLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageLocationResponse"];
+                };
+            };
+        };
+    };
+    adminActivateStorageLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageLocationResponse"];
+                };
+            };
+        };
+    };
+    adminUseDatabaseStorage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    adminStorageMoveSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MoveSummaryResponse"];
+                };
+            };
+        };
+    };
+    adminListStorageMoves: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MoveJobResponse"][];
+                };
+            };
+        };
+    };
+    adminStartStorageMove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartMoveDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MoveJobResponse"];
+                };
+            };
+        };
+    };
+    adminGetStorageMove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MoveJobResponse"];
+                };
+            };
+        };
+    };
+    adminCancelStorageMove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MoveJobResponse"];
                 };
             };
         };
@@ -4958,6 +5940,200 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StaffApplicationResponse"];
+                };
+            };
+        };
+    };
+    adminImportColumns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportColumnResponse"][];
+                };
+            };
+        };
+    };
+    adminImportTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+        };
+    };
+    adminListImports: {
+        parameters: {
+            query?: {
+                /** @description createdAt of the last import on the previous page */
+                before?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobResponse"][];
+                };
+            };
+        };
+    };
+    adminUploadImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["UploadImportDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobResponse"];
+                };
+            };
+        };
+    };
+    adminGetImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobResponse"];
+                };
+            };
+        };
+    };
+    adminListImportItems: {
+        parameters: {
+            query?: {
+                /** @description position of the last item on the previous page */
+                after?: number;
+                limit?: number;
+                status?: "invalid" | "ready" | "skipped" | "imported" | "failed";
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportItemResponse"][];
+                };
+            };
+        };
+    };
+    adminImportReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+        };
+    };
+    adminStartImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobResponse"];
+                };
+            };
+        };
+    };
+    adminCancelImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobResponse"];
                 };
             };
         };

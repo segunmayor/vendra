@@ -42,6 +42,8 @@ export class ProductCardResponse {
   @ApiPropertyOptional({ type: String, nullable: true }) image!: string | null;
   @ApiProperty({ type: MoneyDto }) priceFrom!: MoneyDto;
   @ApiProperty({ type: MoneyDto }) priceTo!: MoneyDto;
+  @ApiPropertyOptional({ type: MoneyDto, nullable: true, description: 'Usual price of the cheapest variant, when discounted' })
+  compareAt!: MoneyDto | null;
   @ApiProperty({ enum: AVAILABILITY }) availability!: Availability;
 }
 
@@ -53,6 +55,7 @@ export class ProductPageResponse {
 class OfferDto {
   @ApiProperty() listingId!: string;
   @ApiProperty({ type: MoneyDto }) price!: MoneyDto;
+  @ApiPropertyOptional({ type: MoneyDto, nullable: true, description: 'The usual price, when discounted' }) compareAt!: MoneyDto | null;
   @ApiProperty({ enum: AVAILABILITY }) availability!: Availability;
   @ApiPropertyOptional({ type: Number, nullable: true, description: 'Set only when stock is low' }) lowStockQuantity!: number | null;
 }
@@ -86,8 +89,14 @@ export class ProductDetailResponse {
 }
 
 const money = (value: Money): MoneyDto => ({ amountMinor: value.minor.toString(), currency: value.currency });
-const offer = (value: Offer): OfferDto => ({ ...value, price: money(value.price) });
-const card = (value: ProductCard): ProductCardResponse => ({ ...value, priceFrom: money(value.priceFrom), priceTo: money(value.priceTo) });
+const optionalMoney = (value: Money | null): MoneyDto | null => (value ? money(value) : null);
+const offer = (value: Offer): OfferDto => ({ ...value, price: money(value.price), compareAt: optionalMoney(value.compareAt) });
+const card = (value: ProductCard): ProductCardResponse => ({
+  ...value,
+  priceFrom: money(value.priceFrom),
+  priceTo: money(value.priceTo),
+  compareAt: optionalMoney(value.compareAt),
+});
 const detail = (value: ProductPage): ProductDetailResponse => ({
   ...value,
   images: [...value.images],

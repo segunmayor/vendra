@@ -16,7 +16,7 @@ export type SettingDefinition =
   | (Base & { readonly kind: 'email' | 'phone' | 'url'; readonly default: string; readonly optional?: boolean })
   | (Base & { readonly kind: 'boolean'; readonly default: boolean });
 
-export type SettingGroup = 'store' | 'shopping' | 'search' | 'security' | 'payments' | 'vendors';
+export type SettingGroup = 'store' | 'shopping' | 'search' | 'security' | 'payments' | 'vendors' | 'imports';
 
 export const GROUPS: Record<SettingGroup, { label: string; description: string }> = {
   store: { label: 'Store', description: 'Name, contact details and the words customers see.' },
@@ -25,6 +25,7 @@ export const GROUPS: Record<SettingGroup, { label: string; description: string }
   security: { label: 'Sign-in and security', description: 'Password rules, sign-in limits and how long people stay signed in.' },
   payments: { label: 'Payments and accounting', description: 'Where customers return after paying, and how payments are recorded in the ledger.' },
   vendors: { label: 'Seller applications', description: 'Whether businesses can apply to sell, and what they must send for verification.' },
+  imports: { label: 'Product imports', description: 'Limits for product files uploaded in bulk, and how their photos are fetched.' },
 };
 
 export const SETTINGS = {
@@ -68,6 +69,15 @@ export const SETTINGS = {
   'vendors.requireTaxCertificate': { group: 'vendors', kind: 'boolean', default: false, label: 'Require the TIN certificate', description: '' },
   'vendors.maxDocumentMb': { group: 'vendors', kind: 'integer', min: 1, max: 10, default: 5, unit: 'MB', label: 'Largest document file', description: 'PDF or photo. 10 MB is the most the system accepts.' },
   'vendors.approvedMessage': { group: 'vendors', kind: 'longtext', maxLength: 500, default: 'Your business is verified. Selling opens soon, and we will contact you when you can add products.', label: 'Message to approved sellers', description: 'Shown on the seller portal once an application is approved.' },
+
+  'imports.maxFileMb': { group: 'imports', kind: 'integer', min: 1, max: 20, default: 5, unit: 'MB', label: 'Largest product file', description: '20 MB is the most the system accepts.' },
+  'imports.maxRows': { group: 'imports', kind: 'integer', min: 10, max: 10000, default: 2000, unit: 'rows', label: 'Most rows in one file', description: 'Split bigger catalogues into several files.' },
+  'imports.maxImagesPerProduct': { group: 'imports', kind: 'integer', min: 1, max: 10, default: 8, unit: 'photos', label: 'Most photos per product', description: 'Extra photo addresses are ignored, with a warning.' },
+  'imports.maxImageMb': { group: 'imports', kind: 'integer', min: 1, max: 10, default: 5, unit: 'MB', label: 'Largest photo', description: 'Applies to photos added in Admin too. In imports, larger photos are skipped with a warning.' },
+  'imports.imageTimeoutSeconds': { group: 'imports', kind: 'integer', min: 5, max: 60, default: 20, unit: 'seconds', label: 'Time allowed to download each photo', description: 'For photos added by web address, in Admin or in imports.' },
+  'imports.allowHttpImages': { group: 'imports', kind: 'boolean', default: false, label: 'Accept photo addresses starting with http://', description: 'Off: only https:// addresses, in Admin and in imports. Turn on only for a supplier that cannot serve https.' },
+  'imports.createMissingBrands': { group: 'imports', kind: 'boolean', default: true, label: 'Create brands that do not exist yet', description: 'Off: a product naming an unknown brand is reported as a problem instead.' },
+  'imports.requireImageToPublish': { group: 'imports', kind: 'boolean', default: true, label: 'Products need a photo to go on sale', description: 'On: a product whose photos could not be fetched is saved as a draft, with its price and stock, for you to finish.' },
 } as const satisfies Record<string, SettingDefinition>;
 
 export type SettingKey = keyof typeof SETTINGS;

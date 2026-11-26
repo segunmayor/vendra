@@ -36,6 +36,20 @@ function parsePrice(priceMinor: string, currency: string): Money {
   return Money.of(BigInt(priceMinor), currency);
 }
 
+/** undefined keeps the current usual price, null or '' removes it. */
+function parseCompareAt(compareAtMinor: string | null | undefined, currency: string): Money | null | undefined {
+  if (compareAtMinor === undefined) return undefined;
+  if (compareAtMinor === null || compareAtMinor === '') return null;
+  return parsePrice(compareAtMinor, currency);
+}
+
+export interface PriceInput {
+  readonly priceMinor: string;
+  readonly currency: string;
+  /** The usual price, shown struck through. Omit to keep it, null to remove the discount. */
+  readonly compareAtMinor?: string | null;
+}
+
 /** Vendra's own listings. Marketplace sellers will reuse the same aggregate after launch. */
 export class ListingService {
   constructor(
@@ -51,7 +65,7 @@ export class ListingService {
     return (await this.listings.listByVariants(variantIds)).map((listing) => listing.snapshot);
   }
 
-  async create(actor: Principal, input: { variantId: string; priceMinor: string; currency: string }): Promise<ListingState> {
+  async create(actor: Principal, input: PriceInput & { variantId: string }): Promise<ListingState> {
     const variant = await this.catalogue.getVariant(input.variantId);
     if (!variant) throw new ApplicationError('not_found', 'variant.not_found', 'Variant not found');
     const listing = Listing.create({
@@ -59,19 +73,26 @@ export class ListingService {
       variantId: variant.variantId,
       sellerId: FIRST_PARTY_SELLER_ID,
       price: parsePrice(input.priceMinor, input.currency),
+      compareAt: parseCompareAt(input.compareAtMinor, input.currency) ?? null,
     });
-    await this.listings.save(listing, this.audit(actor, 'listing.created', listing, { priceMinor: input.priceMinor, currency: input.currency }));
+    await this.listings.save(
+      listing,
+      this.audit(actor, 'listing.created', listing, {
+        priceMinor: input.priceMinor,
+        compareAtMinor: listing.snapshot.compareAt?.minor.toString() ?? null,
+        currency: input.currency,
+      }),
+    );
     return listing.snapshot;
   }
 
-  async changePrice(actor: Principal, id: string, input: { priceMinor: string; currency: string }): Promise<ListingState> {
+  async changePrice(actor: Principal, id: string, input: PriceInput): Promise<ListingState> {
     const listing = await this.load(id);
-    const before = listing.snapshot.price;
-    listing.changePrice(parsePrice(input.priceMinor, input.currency), this.clock.now());
-    await this.listings.save(
-      listing,
-      this.audit(actor, 'listing.price_changed', listing, { priceMinor: input.priceMinor }, { priceMinor: before.minor.toString() }),
-    );
+    const before = listing.snapshot;
+    listing.changePrice(parsePrice(input.priceMinor, input.currency), this.clock.now(), parseCompareAt(input.compareAtMinor, input.currency));
+    if (listing.snapshot === before) return before;
+    const amounts = (state: ListingState) => ({ priceMinor: state.price.minor.toString(), compareAtMinor: state.compareAt?.minor.toString() ?? null });
+    await this.listings.save(listing, this.audit(actor, 'listing.price_changed', listing, amounts(listing.snapshot), amounts(before)));
     return listing.snapshot;
   }
 
@@ -112,6 +133,7 @@ export interface ActiveOffer {
   readonly variantId: string;
   readonly sellerId: string;
   readonly price: Money;
+  readonly compareAt: Money | null;
 }
 
 /** What other modules may ask about listings. */
@@ -134,7 +156,13 @@ export class ListingQueries {
     return (await this.listings.listByVariants(variantIds))
       .map((listing) => listing.snapshot)
       .filter((state) => state.status === 'active')
-      .map((state) => ({ listingId: state.id, variantId: state.variantId, sellerId: state.sellerId, price: state.price }));
+      .map((state) => ({
+        listingId: state.id,
+        variantId: state.variantId,
+        sellerId: state.sellerId,
+        price: state.price,
+        compareAt: state.compareAt,
+      }));
   }
 
   /** Listings by id, with their current price and status. Unknown ids are left out. */

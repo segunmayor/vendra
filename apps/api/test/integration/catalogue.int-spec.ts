@@ -288,7 +288,7 @@ describe('listings', () => {
     const reply = await call('PUT', `admin/listings/${created.id}/price`, { token: manager, body: { priceMinor: '1450000', currency: 'NGN' } });
     expect(reply.body.price.amountMinor).toBe('1450000');
     const entry = await prisma.auditLog.findFirstOrThrow({ where: { targetId: created.id, action: 'listing.price_changed' } });
-    expect([entry.before, entry.after]).toEqual([{ priceMinor: '1500000' }, { priceMinor: '1450000' }]);
+    expect([entry.before, entry.after]).toEqual([{ priceMinor: '1500000', compareAtMinor: null }, { priceMinor: '1450000', compareAtMinor: null }]);
     const events = await prisma.outboxEvent.findMany({ where: { aggregateId: created.id } });
     expect(events.map((e) => e.type)).toEqual(['ListingPriceChanged']);
   });

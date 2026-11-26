@@ -1,2 +1,2 @@
-export { ListingQueries } from './application/listings';
-export type { ActiveOffer, ListingSummary } from './application/listings';
+export { ListingQueries, ListingService } from './application/listings';
+export type { ActiveOffer, ListingState, ListingSummary, PriceInput } from './application/listings';

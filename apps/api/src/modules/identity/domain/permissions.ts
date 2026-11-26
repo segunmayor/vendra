@@ -4,6 +4,7 @@ export const PERMISSIONS = [
   'roles.manage',
   'audit.read',
   'catalogue.manage',
+  'catalogue.import',
   'inventory.manage',
   'orders.manage',
   'orders.refund',

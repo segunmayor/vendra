@@ -24,6 +24,6 @@ import { ListingsController } from './interface/listings.controller';
         new ListingQueries(new PrismaListingRepository(prisma), catalogue),
     },
   ],
-  exports: [ListingQueries],
+  exports: [ListingQueries, ListingService],
 })
 export class ListingsModule {}
