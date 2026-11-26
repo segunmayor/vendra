@@ -55,6 +55,8 @@ export interface StoredObject {
 export interface ObjectRepository {
   add(object: StoredObject & { sha256: string; purpose: FilePurpose }): Promise<void>;
   find(id: string): Promise<StoredObject | null>;
+  /** Several at once, with what each file is for. Unknown ids are left out. */
+  findMany(ids: readonly string[]): Promise<(StoredObject & { purpose: string })[]>;
   remove(id: string): Promise<void>;
   /** Marks a copy no record uses any more (kept after a move). */
   supersede(id: string, at: Date): Promise<void>;
@@ -161,4 +163,9 @@ export interface MoveRepository {
 /** sha256 of file contents, as lower-case hex. */
 export interface Hasher {
   sha256(bytes: Uint8Array): string;
+}
+
+/** Fetches a public address the way a shopper's browser would: no credentials. */
+export interface PublicFetcher {
+  get(url: string): Promise<{ status: number; body: Uint8Array }>;
 }

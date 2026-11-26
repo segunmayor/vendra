@@ -49,6 +49,12 @@ export class PrismaMediaStore implements MediaStore {
     }
   }
 
+  async objectIdsOf(ids: readonly string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.prisma.productMedia.findMany({ where: { id: { in: [...ids] }, storageObjectId: { not: null } }, select: { id: true, storageObjectId: true } });
+    return new Map(rows.map((row) => [row.id, row.storageObjectId!]));
+  }
+
   async read(id: string): Promise<{ contentType: string; content: Uint8Array } | null> {
     const row = await this.prisma.productMedia.findUnique({ where: { id }, select: { contentType: true, content: true, storageObjectId: true } });
     if (!row) return null;

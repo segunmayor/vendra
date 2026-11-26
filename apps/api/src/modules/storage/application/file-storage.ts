@@ -1,5 +1,5 @@
 import { ApplicationError } from '../../../shared-kernel';
-import { FilePurpose, LocationState, objectKey } from '../domain/location';
+import { FilePurpose, LocationState, objectKey, publicUrl, servesPublicly } from '../domain/location';
 import { DriverPool } from './drivers';
 import { reason } from './locations';
 import { LocationRepository, ObjectRepository } from './ports';
@@ -92,9 +92,45 @@ export class FileStorage {
     }
   }
 
-  /** Forgets the remembered active location, after staff change it. */
+  /**
+   * Public addresses for product photos kept in a location that serves them publicly and passed
+   * its last check. Others are left out: they are served through Vendra.
+   */
+  async publicUrls(objectIds: readonly string[]): Promise<Map<string, string>> {
+    const result = new Map<string, string>();
+    if (objectIds.length === 0) return result;
+    const locations = await this.publicLocations();
+    if (locations.size === 0) return result;
+    for (const object of await this.objects.findMany(objectIds)) {
+      const location = locations.get(object.locationId);
+      if (location && object.purpose === 'product-media') result.set(object.id, publicUrl(location.config.publicBaseUrl!, object.key));
+    }
+    return result;
+  }
+
+  /** Forgets the remembered active location and public addresses, after staff change them. */
   invalidate(): void {
     this.cachedActive = null;
+    this.cachedPublic = null;
+    this.changes++;
+  }
+
+  private changes = 0;
+
+  /** Goes up whenever staff change storage settings here, so callers can drop cached addresses. */
+  generation(): number {
+    return this.changes;
+  }
+
+  private cachedPublic: { at: number; locations: Map<string, LocationState> } | null = null;
+
+  private async publicLocations(): Promise<Map<string, LocationState>> {
+    const now = Date.now();
+    if (this.cachedPublic && now - this.cachedPublic.at < ACTIVE_TTL_MS) return this.cachedPublic.locations;
+    // A failed check turns public delivery off until a check passes again: photos then go through Vendra.
+    const locations = new Map((await this.locations.list()).filter((location) => servesPublicly(location) && location.lastCheck?.ok).map((location) => [location.id, location]));
+    this.cachedPublic = { at: now, locations };
+    return locations;
   }
 
   private async active(): Promise<LocationState | null> {

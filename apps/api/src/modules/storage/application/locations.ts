@@ -1,7 +1,7 @@
 import { ApplicationError, AuditEntry, DomainError, Principal } from '../../../shared-kernel';
-import { checkLocation, hint, LocationState, STORAGE_TYPES, storageType } from '../domain/location';
-import { DriverPool, probe } from './drivers';
-import { LocationRepository, LocationUsage, SecretSealer, StorageDriver, StorageUnavailable } from './ports';
+import { checkLocation, hint, LocationState, servesPublicly, STORAGE_TYPES, storageType } from '../domain/location';
+import { DriverPool, probe, probePublic } from './drivers';
+import { LocationRepository, LocationUsage, PublicFetcher, SecretSealer, StorageDriver, StorageUnavailable } from './ports';
 
 export interface LocationInput {
   readonly name: string;
@@ -38,8 +38,9 @@ export class StorageLocationService {
     private readonly pool: DriverPool,
     private readonly ids: { uuid(): string },
     private readonly clock: { now(): Date },
-    /** Tells the file store that the active location may have changed. */
+    /** Tells the file store that the active location (or a public address) may have changed. */
     private readonly changed: () => void,
+    private readonly fetcher: PublicFetcher,
   ) {}
 
   types() {
@@ -64,13 +65,16 @@ export class StorageLocationService {
   async create(actor: Principal, type: string, input: LocationInput): Promise<LocationState> {
     if (!storageType(type)) throw new ApplicationError('not_found', 'storage.unknown_type', `Unknown storage type: ${type}`);
     const draft: LocationState = { id: this.ids.uuid(), type, name: input.name, config: input.config, secretHints: {}, active: false, lastCheck: null, version: 0 };
-    return this.persist(actor, draft, input.credentials, {}, true);
+    const created = await this.persist(actor, draft, input.credentials, {}, true);
+    this.changed();
+    return created;
   }
 
   async update(actor: Principal, id: string, input: LocationInput): Promise<LocationState> {
     const current = await this.find(id);
     const saved = await this.secretsOf(id);
     const updated = await this.persist(actor, { ...current, name: input.name, config: input.config }, input.credentials, saved, false);
+    // Photos may be served from a different address now.
     this.pool.forget(id);
     this.changed();
     return updated;
@@ -81,6 +85,8 @@ export class StorageLocationService {
     const location = await this.find(id);
     const check = await this.check(() => this.pool.driverFor(location), location.config);
     await this.locations.recordCheck(id, check);
+    // A failed check stops photos being served from its public address until one passes.
+    this.changed();
     return { ...location, lastCheck: check };
   }
 
@@ -119,7 +125,9 @@ export class StorageLocationService {
     const at = this.clock.now();
     try {
       // Inside the location's folder, so a key limited to that folder passes too.
-      await probe(await driver(), [config.prefix, '.vendra-checks', `check-${this.ids.uuid()}.txt`].filter(Boolean).join('/'));
+      const built = await driver();
+      await probe(built, [config.prefix, '.vendra-checks', `check-${this.ids.uuid()}.txt`].filter(Boolean).join('/'));
+      await probePublic(built, this.fetcher, { config }, this.ids.uuid());
       return { at, ok: true, message: null };
     } catch (error) {
       return { at, ok: false, message: reason(error) };
@@ -140,9 +148,11 @@ export class StorageLocationService {
   ): Promise<LocationState> {
     const { name, config, secrets } = checkLocation(draft, incoming, saved);
     const changedSecrets = Object.keys(secrets).filter((key) => secrets[key] !== saved[key]);
-    // Files are going to the active location right now: refuse settings that do not work.
-    if (draft.active) {
-      const check = await this.check(() => this.pool.build({ type: draft.type, config }, secrets), config);
+    // Files are going to the active location, or shoppers will load photos from the public
+    // address, right after saving: refuse settings that do not work.
+    let check: Awaited<ReturnType<StorageLocationService['check']>> | null = null;
+    if (draft.active || servesPublicly({ config })) {
+      check = await this.check(() => this.pool.build({ type: draft.type, config }, secrets), config);
       if (!check.ok) throw failed(`The new settings did not pass the check, so nothing was changed: ${check.message}`);
     }
     const state: LocationState = {
@@ -163,7 +173,8 @@ export class StorageLocationService {
         credentialsChanged: changedSecrets,
       }),
     );
-    return { ...state, version: state.version + 1 };
+    if (check) await this.locations.recordCheck(state.id, check);
+    return { ...state, lastCheck: check ?? state.lastCheck, version: state.version + 1 };
   }
 
   private audit(actor: Principal, action: string, targetId: string, after: Record<string, unknown>): AuditEntry {

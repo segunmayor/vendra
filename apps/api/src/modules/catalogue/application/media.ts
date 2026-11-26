@@ -2,7 +2,7 @@ import { DomainError } from '../../../shared-kernel';
 import { checkImage, IMAGE_EXTENSIONS } from '../domain/image-file';
 
 export { IMAGE_HARD_LIMIT_BYTES } from '../domain/image-file';
-import { DownloadLimits, Hasher, Ids, MediaStore, RemoteFiles } from './ports';
+import { DownloadLimits, Hasher, Ids, ImageAddresses, MediaStore, PublicFileUrls, RemoteFiles } from './ports';
 
 const FILE = /^([0-9a-f-]{36})\.([a-z]{3,4})$/;
 const MAX_URL = 2000;
@@ -10,14 +10,66 @@ const MAX_URL = 2000;
 /** The address a stored photo is served at, relative to each portal. */
 export const mediaPath = (id: string, extension: string): string => `/media/${id}.${extension}`;
 
+const PATH = /^\/media\/([0-9a-f-]{36})\.[a-z]{3,4}$/;
+/** Public addresses change only when staff change a storage location or move files. */
+const ADDRESS_TTL_MS = 60_000;
+const ADDRESS_CACHE_SIZE = 10_000;
+
 /** Product photos: downloaded once, checked by content, stored once per distinct file. */
-export class ProductMediaService {
+export class ProductMediaService implements ImageAddresses {
+  private readonly addresses = new Map<string, { at: number; url: string | null }>();
+  private generation = -1;
+
   constructor(
     private readonly store: MediaStore,
     private readonly remote: RemoteFiles,
     private readonly hasher: Hasher,
     private readonly ids: Ids,
+    private readonly publicFiles: PublicFileUrls,
   ) {}
+
+  /**
+   * Public (CDN) addresses for photos whose storage location serves them publicly. Others are
+   * left out, and are loaded from their own path, through Vendra.
+   */
+  async resolve(paths: readonly string[]): Promise<Map<string, string>> {
+    // Staff changed storage settings on this server: forget addresses at once (other servers
+    // catch up within the cache time).
+    const generation = this.publicFiles.generation();
+    if (generation !== this.generation) {
+      this.addresses.clear();
+      this.generation = generation;
+    }
+    const result = new Map<string, string>();
+    const now = Date.now();
+    const missing: { path: string; id: string }[] = [];
+    for (const path of new Set(paths)) {
+      const cached = this.addresses.get(path);
+      if (cached && now - cached.at < ADDRESS_TTL_MS) {
+        if (cached.url) result.set(path, cached.url);
+        continue;
+      }
+      const id = PATH.exec(path)?.[1];
+      if (id) missing.push({ path, id });
+    }
+    if (missing.length === 0) return result;
+    const objectIds = await this.store.objectIdsOf(missing.map((entry) => entry.id));
+    const urls = await this.publicFiles.publicUrls([...objectIds.values()]);
+    if (this.addresses.size + missing.length > ADDRESS_CACHE_SIZE) this.addresses.clear();
+    for (const { path, id } of missing) {
+      const objectId = objectIds.get(id);
+      const url = objectId ? (urls.get(objectId) ?? null) : null;
+      this.addresses.set(path, { at: now, url });
+      if (url) result.set(path, url);
+    }
+    return result;
+  }
+
+  /** The public address of one photo, for redirecting old /media/ links. */
+  async publicAddressOf(fileName: string): Promise<string | null> {
+    const path = `/media/${fileName}`;
+    return (await this.resolve([path])).get(path) ?? null;
+  }
 
   /**
    * Downloads a photo and returns the address to put on a product. A URL already downloaded is

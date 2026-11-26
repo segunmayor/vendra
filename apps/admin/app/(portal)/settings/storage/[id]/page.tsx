@@ -50,8 +50,24 @@ export default async function LocationPage({ params, searchParams }: { params: P
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <Card>
-          {location.active ? (
-            <p className="mb-4 text-sm text-muted">New files are going here now, so changed settings are tested before they are saved. If the test fails, nothing changes.</p>
+          {location.config.publicDelivery === 'true' ? (
+            <div className="mb-4">
+              {location.lastCheck?.ok ? (
+                <Alert tone="success">
+                  Shoppers load product photos kept here from <span className="font-medium break-all">{location.config.publicBaseUrl}</span>. Seller documents still go through Vendra.
+                </Alert>
+              ) : (
+                <Alert tone="warning">
+                  The last check failed, so product photos kept here are served through Vendra until a check passes. Fix the public address or the CDN, then test again.
+                </Alert>
+              )}
+            </div>
+          ) : null}
+          {location.active || location.config.publicDelivery === 'true' ? (
+            <p className="mb-4 text-sm text-muted">
+              {location.active ? 'New files are going here now' : 'Photos are served from its public address'}, so changed settings are tested before they are saved. If the test fails,
+              nothing changes.
+            </p>
           ) : null}
           <ActionForm action={updateLocation.bind(null, location.id)} className="space-y-5">
             <LocationFields type={type} location={location} />
@@ -62,7 +78,10 @@ export default async function LocationPage({ params, searchParams }: { params: P
         <div className="space-y-4">
           <Card>
             <h2 className="font-semibold">Check the connection</h2>
-            <p className="mt-1 mb-3 text-sm text-muted">Writes a small test file with the saved settings, reads it back and deletes it.</p>
+            <p className="mt-1 mb-3 text-sm text-muted">
+              Writes a small test file with the saved settings, reads it back and deletes it.
+              {location.config.publicDelivery === 'true' ? ' Also checks that a test photo opens at the public address and a test seller document does not.' : ''}
+            </p>
             {location.lastCheck ? (
               <div className="mb-3 text-sm">
                 <Badge tone={location.lastCheck.ok ? 'success' : 'danger'}>{location.lastCheck.ok ? 'Working' : 'Failed'}</Badge>{' '}

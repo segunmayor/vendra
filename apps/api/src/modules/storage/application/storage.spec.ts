@@ -64,9 +64,12 @@ class MemoryLocations implements LocationRepository {
 }
 
 class MemoryObjects implements ObjectRepository {
-  readonly rows = new Map<string, StoredObject>();
-  async add(object: StoredObject) {
+  readonly rows = new Map<string, StoredObject & { purpose: string }>();
+  async add(object: StoredObject & { purpose: string }) {
     this.rows.set(object.id, object);
+  }
+  async findMany(ids: readonly string[]) {
+    return ids.flatMap((id) => (this.rows.has(id) ? [this.rows.get(id)!] : []));
   }
   async find(id: string) {
     return this.rows.get(id) ?? null;
@@ -99,12 +102,24 @@ function setup() {
   const ids = { uuid: () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}` };
   const clock = { now: () => new Date('2026-11-26T12:00:00Z') };
   const files = new FileStorage(locations, objects, pool, ids, clock);
-  const service = new StorageLocationService(locations, sealer, pool, ids, clock, () => files.invalidate());
-  return { driver, built, locations, objects, files, service };
+  /** A CDN in front of the memory bucket: what it serves depends on what the test makes public. */
+  const cdn = { base: 'https://cdn.example.test', publicPrefixes: ['vendra/product-media/'], reachable: true };
+  const fetcher = {
+    get: async (url: string) => {
+      if (!cdn.reachable) throw new Error('ENOTFOUND');
+      const key = decodeURIComponent(url.slice(cdn.base.length + 1));
+      const file = driver.files.get(key);
+      return file && cdn.publicPrefixes.some((prefix) => key.startsWith(prefix)) ? { status: 200, body: file } : { status: 403, body: new Uint8Array() };
+    },
+  };
+  const service = new StorageLocationService(locations, sealer, pool, ids, clock, () => files.invalidate(), fetcher);
+  return { driver, built, locations, objects, files, service, cdn };
 }
 
 const input = { name: 'Photos on R2', config: { endpoint: 'https://abc.r2.cloudflarestorage.com', bucket: 'vendra-files' }, credentials: { accessKeyId: 'AKIA1234', secretAccessKey: 'very-secret-key-9876' } };
 const photo = { purpose: 'product-media' as const, contentType: 'image/png', extension: 'png', content: new Uint8Array([1, 2, 3]), sha256: 'abc' };
+
+const photo_ = { purpose: 'product-media' as const, contentType: 'image/png', extension: 'png', content: new Uint8Array([1, 2, 3]), sha256: 'abc' };
 
 describe('storage locations', () => {
   it('seals credentials and keeps only hints', async () => {
@@ -174,4 +189,56 @@ describe('storage locations', () => {
     await service.remove(actor, created.id);
     expect(locations.audits).toContain('storage.location_removed');
   });
+
+  describe('public address (CDN)', () => {
+    const withCdn = { ...input, config: { ...input.config, publicDelivery: 'true', publicBaseUrl: 'https://cdn.example.test' } };
+
+    it('checks that photos open there before saving, then hands out public addresses for photos only', async () => {
+      const { service, files, driver } = setup();
+      const created = await service.create(actor, 's3_compatible', withCdn);
+      expect(created.lastCheck).toMatchObject({ ok: true });
+      // Both test files are cleaned up.
+      expect(driver.files.size).toBe(0);
+      await service.activate(actor, created.id);
+      const photo = await files.put(photo_);
+      const document = await files.put({ ...photo_, purpose: 'seller-documents', contentType: 'application/pdf', extension: 'pdf' });
+      const urls = await files.publicUrls([photo!.objectId, document!.objectId]);
+      expect(urls.get(photo!.objectId)).toBe(`https://cdn.example.test/vendra/product-media/2026/11/${photo!.objectId}.png`);
+      expect(urls.has(document!.objectId)).toBe(false);
+    });
+
+    it('refuses an address where seller documents can be opened', async () => {
+      const { service, cdn } = setup();
+      cdn.publicPrefixes = ['vendra/'];
+      await expect(service.create(actor, 's3_compatible', withCdn)).rejects.toThrow('Seller documents can be opened by anyone');
+    });
+
+    it('refuses an address that does not serve the bucket, or cannot be reached', async () => {
+      const first = setup();
+      first.cdn.publicPrefixes = [];
+      await expect(first.service.create(actor, 's3_compatible', withCdn)).rejects.toThrow('did not open at the public address (it answered 403)');
+      const second = setup();
+      second.cdn.reachable = false;
+      await expect(second.service.create(actor, 's3_compatible', withCdn)).rejects.toThrow('could not be reached');
+    });
+
+    it('stops handing out public addresses after a failed check, until one passes', async () => {
+      const { service, files, cdn } = setup();
+      const created = await service.create(actor, 's3_compatible', withCdn);
+      await service.activate(actor, created.id);
+      const photo = await files.put(photo_);
+      cdn.reachable = false;
+      await service.test(created.id);
+      expect((await files.publicUrls([photo!.objectId])).size).toBe(0);
+      cdn.reachable = true;
+      await service.test(created.id);
+      expect((await files.publicUrls([photo!.objectId])).size).toBe(1);
+    });
+
+    it('needs the address when serving publicly is turned on', async () => {
+      const { service } = setup();
+      await expect(service.create(actor, 's3_compatible', { ...input, config: { ...input.config, publicDelivery: 'true' } })).rejects.toThrow('Enter the public address');
+    });
+  });
 });
+

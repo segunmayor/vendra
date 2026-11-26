@@ -82,7 +82,14 @@ export default async function StoragePage({ searchParams }: { searchParams: Prom
                 {location.name}
               </Link>
             </Td>
-            <Td>{label.get(location.type) ?? location.type}</Td>
+            <Td>
+              {label.get(location.type) ?? location.type}
+              {location.config.publicDelivery === 'true' ? (
+                <div className="mt-1">
+                  <Badge tone={location.lastCheck?.ok ? 'success' : 'warning'}>{location.lastCheck?.ok ? 'Photos via CDN' : 'CDN off: check failed'}</Badge>
+                </div>
+              ) : null}
+            </Td>
             <Td>{location.active ? <Badge tone="success">New files go here</Badge> : <Badge>Not used for new files</Badge>}</Td>
             <Td>
               {location.lastCheck ? (

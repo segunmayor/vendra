@@ -1,5 +1,5 @@
 import { DomainError } from '../../../shared-kernel';
-import { checkLocation, hint, objectKey, STORAGE_TYPES } from './location';
+import { checkLocation, hint, objectKey, publicUrl, servesPublicly, STORAGE_TYPES } from './location';
 
 const s3 = (config: Record<string, string>, name = 'Photos on R2') => ({ type: 's3_compatible', name, config });
 const keys = { accessKeyId: 'AKIAEXAMPLE', secretAccessKey: 'secret-value-123456' };
@@ -7,7 +7,7 @@ const keys = { accessKeyId: 'AKIAEXAMPLE', secretAccessKey: 'secret-value-123456
 describe('storage location checks', () => {
   it('fills defaults and trims the folder', () => {
     const result = checkLocation(s3({ endpoint: 'https://abc.r2.cloudflarestorage.com/', bucket: 'vendra-files', prefix: '/shop/files/' }), keys, {});
-    expect(result.config).toEqual({ endpoint: 'https://abc.r2.cloudflarestorage.com', region: 'auto', bucket: 'vendra-files', prefix: 'shop/files', pathStyle: 'false' });
+    expect(result.config).toEqual({ endpoint: 'https://abc.r2.cloudflarestorage.com', region: 'auto', bucket: 'vendra-files', prefix: 'shop/files', pathStyle: 'false', publicDelivery: 'false', publicBaseUrl: '' });
     expect(result.secrets).toEqual(keys);
   });
 
@@ -62,5 +62,20 @@ describe('object keys', () => {
   it('hides all but the end of a credential', () => {
     expect(hint('short')).toBe('••••');
     expect(hint('abcdefghijkl')).toBe('••••ijkl');
+  });
+});
+
+describe('public addresses', () => {
+  it('builds addresses with each part of the key encoded', () => {
+    expect(publicUrl('https://cdn.example.test/', 'shop files/product-media/a b.png')).toBe('https://cdn.example.test/shop%20files/product-media/a%20b.png');
+  });
+
+  it('serves publicly only when turned on with an address, and never for MEGA', () => {
+    expect(servesPublicly({ config: { publicDelivery: 'true', publicBaseUrl: 'https://cdn.example.test' } })).toBe(true);
+    expect(servesPublicly({ config: { publicDelivery: 'false', publicBaseUrl: 'https://cdn.example.test' } })).toBe(false);
+    expect(STORAGE_TYPES.find((type) => type.type === 'mega')!.config.some((field) => field.key === 'publicDelivery')).toBe(false);
+    const checked = checkLocation({ type: 'aws_s3', name: 'S3', config: { region: 'af-south-1', bucket: 'shop-files', publicDelivery: 'true', publicBaseUrl: 'https://d1234.cloudfront.net/' } }, keys, {});
+    expect(checked.config).toMatchObject({ publicDelivery: 'true', publicBaseUrl: 'https://d1234.cloudfront.net' });
+    expect(() => checkLocation({ type: 'aws_s3', name: 'S3', config: { region: 'af-south-1', bucket: 'shop-files', publicDelivery: 'true', publicBaseUrl: 'http://cdn.example.test' } }, keys, {})).toThrow('https://');
   });
 });

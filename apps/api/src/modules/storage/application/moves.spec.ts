@@ -79,6 +79,9 @@ class Objects implements ObjectRepository {
   async find(id: string) {
     return this.rows.get(id) ?? null;
   }
+  async findMany(ids: readonly string[]) {
+    return ids.flatMap((id) => (this.rows.has(id) ? [{ ...this.rows.get(id)!, purpose: 'product-media' }] : []));
+  }
   async remove(id: string) {
     this.rows.delete(id);
   }
