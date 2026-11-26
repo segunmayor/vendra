@@ -88,6 +88,6 @@ class InventoryReactions implements OnModuleInit {
       useFactory: (prisma: PrismaService) => new InventoryQueries(new PrismaStockRepository(prisma)),
     },
   ],
-  exports: [InventoryQueries, InventoryCommands],
+  exports: [InventoryQueries, InventoryCommands, InventoryService],
 })
 export class InventoryModule {}

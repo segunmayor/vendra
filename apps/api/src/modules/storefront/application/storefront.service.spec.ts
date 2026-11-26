@@ -57,6 +57,7 @@ const offer = (variantId: string, minor: bigint, listingId = `l-${variantId}`): 
   variantId,
   sellerId: 's1',
   price: ngn(minor),
+  compareAt: null,
 });
 
 describe('StorefrontService', () => {

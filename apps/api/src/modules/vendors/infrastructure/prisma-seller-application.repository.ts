@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { appendAudit } from '../../../platform/audit/audit';
 import { appendToOutbox } from '../../../platform/outbox/outbox';
 import { ApplicationError, AuditEntry, ConcurrencyConflict } from '../../../shared-kernel';
+import { FileHolder, FileStorage, HeldFile } from '../../storage';
 import { DocumentUpload, SellerApplicationRepository } from '../application/ports';
 import { BusinessAddress, BusinessKind, BusinessProfile, CaseStatus, DocumentKind, SellerApplication, SellerStatus } from '../domain/seller-application';
 
@@ -16,8 +17,17 @@ type Row = Prisma.SellerGetPayload<{ include: typeof include }>;
 
 const MARKETPLACE = { type: 'marketplace' } as const;
 
+const DOCUMENT_EXTENSIONS: Readonly<Record<string, string>> = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+
+/** The bytes in the row, or a reference to where the active storage location keeps them. */
+const storedContent = (stored: { objectId: string } | null, content: Uint8Array) =>
+  stored ? { content: null, storageObjectId: stored.objectId } : { content: Buffer.from(content), storageObjectId: null };
+
 export class PrismaSellerApplicationRepository implements SellerApplicationRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly files: FileStorage,
+  ) {}
 
   async findById(id: string): Promise<SellerApplication | null> {
     const row = await this.prisma.seller.findFirst({ where: { id, ...MARKETPLACE }, include });
@@ -50,8 +60,10 @@ export class PrismaSellerApplicationRepository implements SellerApplicationRepos
   }
 
   async readDocument(sellerId: string, documentId: string): Promise<Uint8Array | null> {
-    const row = await this.prisma.sellerDocument.findFirst({ where: { id: documentId, sellerId }, select: { content: true } });
-    return row ? new Uint8Array(row.content) : null;
+    const row = await this.prisma.sellerDocument.findFirst({ where: { id: documentId, sellerId }, select: { content: true, storageObjectId: true } });
+    if (!row) return null;
+    if (row.content) return new Uint8Array(row.content);
+    return row.storageObjectId ? this.files.get(row.storageObjectId) : null;
   }
 
   async save(application: SellerApplication, audit: AuditEntry, uploads: readonly DocumentUpload[] = []): Promise<void> {
@@ -66,6 +78,23 @@ export class PrismaSellerApplicationRepository implements SellerApplicationRepos
   }
 
   private async write(application: SellerApplication, audit: AuditEntry, uploads: readonly DocumentUpload[]): Promise<void> {
+    // Written to the storage location (if one is active) before the transaction: a slow upload
+    // must not hold database locks. If the transaction then fails, the stored file is unused.
+    const stored = new Map<string, { objectId: string } | null>();
+    for (const upload of uploads) {
+      const document = application.allDocuments.find((entry) => entry.id === upload.documentId);
+      if (!document) continue;
+      stored.set(
+        upload.documentId,
+        await this.files.put({
+          purpose: 'seller-documents',
+          contentType: document.contentType,
+          extension: DOCUMENT_EXTENSIONS[document.contentType] ?? 'bin',
+          content: upload.content,
+          sha256: createHash('sha256').update(upload.content).digest('hex'),
+        }),
+      );
+    }
     const events = application.pullEvents();
     const profile = application.profile;
     const fields = {
@@ -100,7 +129,7 @@ export class PrismaSellerApplicationRepository implements SellerApplicationRepos
             contentType: document.contentType,
             sizeBytes: upload.content.length,
             sha256: createHash('sha256').update(upload.content).digest('hex'),
-            content: Buffer.from(upload.content),
+            ...storedContent(stored.get(upload.documentId) ?? null, upload.content),
             uploadedAt: document.uploadedAt,
           },
         });
@@ -162,4 +191,37 @@ function toApplication(row: Row): SellerApplication {
     createdAt: row.createdAt,
     version: row.version,
   });
+}
+
+/** Lets the storage module move seller documents between the database and storage locations. */
+export class SellerDocumentFiles implements FileHolder {
+  readonly purpose = 'seller-documents' as const;
+
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async scan(afterRowId: string | null, limit: number): Promise<HeldFile[]> {
+    const rows = await this.prisma.sellerDocument.findMany({
+      where: afterRowId ? { id: { gt: afterRowId } } : {},
+      orderBy: { id: 'asc' },
+      take: limit,
+      select: { id: true, storageObjectId: true, contentType: true, sizeBytes: true, sha256: true },
+    });
+    return rows.map((row) => ({ rowId: row.id, objectId: row.storageObjectId, contentType: row.contentType, sizeBytes: row.sizeBytes, sha256: row.sha256 }));
+  }
+
+  async inlineUsage(): Promise<{ files: number; bytes: number }> {
+    const row = await this.prisma.sellerDocument.aggregate({ where: { content: { not: null } }, _count: { _all: true }, _sum: { sizeBytes: true } });
+    return { files: row._count._all, bytes: row._sum.sizeBytes ?? 0 };
+  }
+
+  async readInline(rowId: string): Promise<Uint8Array | null> {
+    const row = await this.prisma.sellerDocument.findUnique({ where: { id: rowId }, select: { content: true } });
+    return row?.content ? new Uint8Array(row.content) : null;
+  }
+
+  async repoint(rowId: string, from: string | null, to: string): Promise<boolean> {
+    const where = from ? { id: rowId, storageObjectId: from } : { id: rowId, storageObjectId: null, content: { not: null } };
+    const { count } = await this.prisma.sellerDocument.updateMany({ where, data: { content: null, storageObjectId: to } });
+    return count === 1;
+  }
 }

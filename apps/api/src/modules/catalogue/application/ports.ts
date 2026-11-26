@@ -3,6 +3,7 @@ import { AttributeDefinition } from '../domain/attributes';
 import { Product, ProductStatus } from '../domain/product';
 
 export type { ProductState, ProductStatus, Variant } from '../domain/product';
+export type { AttributeDefinition, AttributeValue } from '../domain/attributes';
 
 export interface Clock {
   now(): Date;
@@ -54,7 +55,42 @@ export interface BrandRepository {
 
 export interface ProductRepository {
   findById(id: string): Promise<Product | null>;
+  findBySlug(slug: string): Promise<Product | null>;
+  /** The product that owns each SKU. SKUs nobody uses are left out. */
+  skuOwners(skus: readonly string[]): Promise<Map<string, string>>;
   /** Commits state, events and audit together. Rejects a stale version and duplicate slugs or SKUs. */
   save(product: Product, audit: AuditEntry): Promise<void>;
   list(query: { limit: number; cursor?: string; status?: ProductStatus }): Promise<ProductSummary[]>;
+}
+
+export interface StoredMedia {
+  readonly id: string;
+  readonly contentType: string;
+  readonly extension: string;
+}
+
+export interface MediaStore {
+  findBySourceUrl(url: string): Promise<StoredMedia | null>;
+  /** Stores the file once per sha256. Saving bytes already stored returns the existing record. */
+  save(media: { id: string; sha256: string; contentType: string; extension: string; content: Uint8Array; sourceUrl: string | null }): Promise<StoredMedia>;
+  read(id: string): Promise<{ contentType: string; content: Uint8Array } | null>;
+}
+
+export interface DownloadLimits {
+  readonly maxBytes: number;
+  readonly timeoutMs: number;
+  readonly allowHttp: boolean;
+}
+
+/**
+ * Fetches a file from the internet on a staff member's behalf. Must refuse private and
+ * internal addresses (including after redirects and DNS changes), stop at `maxBytes`, and
+ * throw a DomainError whose message staff can act on.
+ */
+export interface RemoteFiles {
+  download(url: string, limits: DownloadLimits): Promise<Uint8Array>;
+}
+
+export interface Hasher {
+  sha256(bytes: Uint8Array): string;
 }

@@ -9,7 +9,7 @@ datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_DATABASE_URL")
-  schemas   = ["platform", "identity", "customers", "sellers", "catalogue", "inventory", "cart", "orders", "payments", "ledger", "shipping"]
+  schemas   = ["platform", "identity", "customers", "sellers", "catalogue", "inventory", "cart", "orders", "payments", "ledger", "shipping", "storage"]
 }
 
 // ---------- platform ----------
@@ -274,17 +274,20 @@ model VerificationCase {
 
 /// Verification documents. Kept in the database at launch (low volume, no file store chosen yet).
 model SellerDocument {
-  id          String    @id @db.Uuid
-  sellerId    String    @db.Uuid
-  kind        String
-  fileName    String
-  contentType String
-  sizeBytes   Int
-  sha256      String
-  content     Bytes
-  uploadedAt  DateTime  @db.Timestamptz
-  removedAt   DateTime? @db.Timestamptz
-  seller      Seller    @relation(fields: [sellerId], references: [id])
+  id              String    @id @db.Uuid
+  sellerId        String    @db.Uuid
+  kind            String
+  fileName        String
+  contentType     String
+  sizeBytes       Int
+  sha256          String
+  /// The file itself while files are kept in the database; null when it is in a storage location.
+  content         Bytes?
+  /// storage.objects.id when the file is kept in a storage location. Not a foreign key: another schema.
+  storageObjectId String?   @db.Uuid
+  uploadedAt      DateTime  @db.Timestamptz
+  removedAt       DateTime? @db.Timestamptz
+  seller          Seller    @relation(fields: [sellerId], references: [id])
 
   @@index([sellerId])
   @@map("seller_documents")
@@ -359,18 +362,90 @@ model ProductVariant {
 }
 
 model Listing {
-  id         String         @id @default(uuid()) @db.Uuid
-  variantId  String         @db.Uuid
-  sellerId   String         @db.Uuid
-  priceMinor BigInt
-  currency   String         @db.Char(3)
-  status     String         @default("draft")
-  version    Int            @default(0)
-  variant    ProductVariant @relation(fields: [variantId], references: [id])
+  id             String         @id @default(uuid()) @db.Uuid
+  variantId      String         @db.Uuid
+  sellerId       String         @db.Uuid
+  priceMinor     BigInt
+  /// The usual price, shown struck through when it is higher than priceMinor. Null means no discount.
+  compareAtMinor BigInt?
+  currency       String         @db.Char(3)
+  status         String         @default("draft")
+  version        Int            @default(0)
+  variant        ProductVariant @relation(fields: [variantId], references: [id])
 
   @@unique([variantId, sellerId])
   @@index([sellerId, status])
   @@map("listings")
+  @@schema("catalogue")
+}
+
+/// Product photos, stored once per distinct file (sha256). Behind the catalogue's media port,
+/// so object storage can replace the table without touching callers.
+model ProductMedia {
+  id              String   @id @db.Uuid
+  sha256          String   @unique
+  contentType     String
+  sizeBytes       Int
+  /// The file itself while files are kept in the database; null when it is in a storage location.
+  content         Bytes?
+  /// storage.objects.id when the file is kept in a storage location. Not a foreign key: another schema.
+  storageObjectId String?  @db.Uuid
+  /// Where the file was downloaded from, when it came from an import.
+  sourceUrl       String?
+  createdAt       DateTime @default(now()) @db.Timestamptz
+
+  @@index([sourceUrl])
+  @@map("product_media")
+  @@schema("catalogue")
+}
+
+/// One uploaded product file (CSV now; JSON and XML later), checked before anything is created.
+model ImportJob {
+  id         String       @id @db.Uuid
+  format     String
+  fileName   String
+  sha256     String
+  sizeBytes  Int
+  mode       String
+  status     String
+  /// File-level problems, such as a missing column. A job with any cannot be started.
+  issues     Json         @default("[]")
+  summary    Json         @default("{}")
+  createdBy  String       @db.Uuid
+  createdAt  DateTime     @default(now()) @db.Timestamptz
+  startedAt  DateTime?    @db.Timestamptz
+  finishedAt DateTime?    @db.Timestamptz
+  /// A worker holds the job until this time; a crashed worker's job is picked up after it.
+  leaseUntil DateTime?    @db.Timestamptz
+  version    Int          @default(0)
+  items      ImportItem[]
+
+  @@index([status, leaseUntil])
+  @@index([createdAt])
+  @@map("import_jobs")
+  @@schema("catalogue")
+}
+
+/// One product in an import (one or more rows sharing a handle) and what happened to it.
+model ImportItem {
+  id          String    @id @db.Uuid
+  jobId       String    @db.Uuid
+  position    Int
+  handle      String
+  name        String
+  rowNumbers  Json
+  payload     Json
+  action      String
+  status      String
+  errors      Json      @default("[]")
+  warnings    Json      @default("[]")
+  productId   String?   @db.Uuid
+  processedAt DateTime? @db.Timestamptz
+  job         ImportJob @relation(fields: [jobId], references: [id])
+
+  @@unique([jobId, position])
+  @@index([jobId, status, position])
+  @@map("import_items")
   @@schema("catalogue")
 }
 
@@ -495,29 +570,29 @@ model CartItem {
 // ---------- orders ----------
 
 model Order {
-  id              String        @id @default(uuid()) @db.Uuid
-  number          String        @unique
+  id                 String        @id @default(uuid()) @db.Uuid
+  number             String        @unique
   /// The paid checkout this order came from. One order per checkout.
-  checkoutId      String        @unique @db.Uuid
-  paymentId       String        @db.Uuid
-  customerId      String        @db.Uuid
-  status          String        @default("placed")
-  currency        String        @db.Char(3)
-  subtotalMinor   BigInt
-  deliveryMinor   BigInt
-  discountMinor   BigInt        @default(0)
-  totalMinor      BigInt
-  shippingAddress Json
-  version         Int           @default(0)
-  placedAt        DateTime      @default(now()) @db.Timestamptz
+  checkoutId         String        @unique @db.Uuid
+  paymentId          String        @db.Uuid
+  customerId         String        @db.Uuid
+  status             String        @default("placed")
+  currency           String        @db.Char(3)
+  subtotalMinor      BigInt
+  deliveryMinor      BigInt
+  discountMinor      BigInt        @default(0)
+  totalMinor         BigInt
+  shippingAddress    Json
+  version            Int           @default(0)
+  placedAt           DateTime      @default(now()) @db.Timestamptz
   /// Set together when staff cancel the order.
-  cancelledAt        DateTime? @db.Timestamptz
-  cancelledBy        String?   @db.Uuid
+  cancelledAt        DateTime?     @db.Timestamptz
+  cancelledBy        String?       @db.Uuid
   cancellationReason String?
-  createdAt       DateTime      @default(now()) @db.Timestamptz
-  updatedAt       DateTime      @updatedAt @db.Timestamptz
-  sellerOrders    SellerOrder[]
-  refunds         OrderRefund[]
+  createdAt          DateTime      @default(now()) @db.Timestamptz
+  updatedAt          DateTime      @updatedAt @db.Timestamptz
+  sellerOrders       SellerOrder[]
+  refunds            OrderRefund[]
 
   @@index([customerId, createdAt])
   @@index([status, placedAt])
@@ -841,4 +916,80 @@ model DeliveryAttempt {
   @@unique([shipmentId, attemptNumber])
   @@map("delivery_attempts")
   @@schema("shipping")
+}
+
+// ---------- storage (where uploaded files are kept) ----------
+
+/// A storage service staff configured in Admin. At most one is active (a partial unique index);
+/// with none active, files are kept in the database.
+model StorageLocation {
+  id             String          @id @db.Uuid
+  type           String
+  name           String
+  config         Json            @default("{}")
+  /// AES-256-GCM ciphertext of the credentials. Never plain text.
+  secrets        String?
+  secretHints    Json            @default("{}")
+  active         Boolean         @default(false)
+  lastCheckedAt  DateTime?       @db.Timestamptz
+  lastCheckOk    Boolean?
+  lastCheckError String?
+  version        Int             @default(0)
+  createdAt      DateTime        @default(now()) @db.Timestamptz
+  updatedAt      DateTime        @updatedAt @db.Timestamptz
+  objects        StorageObject[]
+
+  @@map("locations")
+  @@schema("storage")
+}
+
+/// One file written to a storage location. Rows are never moved: a file is read from where it was written.
+model StorageObject {
+  id          String          @id @db.Uuid
+  locationId  String          @db.Uuid
+  key         String
+  contentType String
+  sizeBytes   Int
+  sha256      String
+  purpose     String
+  createdAt   DateTime        @default(now()) @db.Timestamptz
+  /// Set when a move gave the file a new copy elsewhere and this one was kept. No record points here any more.
+  supersededAt DateTime?      @db.Timestamptz
+  location    StorageLocation @relation(fields: [locationId], references: [id], onDelete: Restrict)
+
+  @@unique([locationId, key])
+  @@index([locationId])
+  @@map("objects")
+  @@schema("storage")
+}
+
+/// Moves files that are not in a location yet (in the database, or in another location) into it.
+/// One job at a time (a partial unique index on queued and running jobs).
+model StorageMoveJob {
+  id               String    @id @db.Uuid
+  targetLocationId String    @db.Uuid
+  /// queued | running | completed | cancelled | failed
+  status           String
+  /// Delete the copy in the old storage location once a file is moved. Bytes in the database are always cleared.
+  deleteOld        Boolean
+  total            Int
+  moved            Int       @default(0)
+  skipped          Int       @default(0)
+  failed           Int       @default(0)
+  movedBytes       BigInt    @default(0)
+  /// Where to resume: which kind of file, and the last row done.
+  cursor           Json      @default("{}")
+  /// The latest problems, newest first, at most 20.
+  problems         Json      @default("[]")
+  message          String?
+  createdBy        String    @db.Uuid
+  createdAt        DateTime  @default(now()) @db.Timestamptz
+  startedAt        DateTime? @db.Timestamptz
+  finishedAt       DateTime? @db.Timestamptz
+  leaseUntil       DateTime? @db.Timestamptz
+  version          Int       @default(0)
+
+  @@index([createdAt])
+  @@map("move_jobs")
+  @@schema("storage")
 }

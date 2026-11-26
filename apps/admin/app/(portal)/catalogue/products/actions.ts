@@ -1,5 +1,6 @@
 'use server';
 
+import type { components } from '@vendra/api-client';
 import type { FormState } from '@vendra/ui';
 import { nairaToKobo } from '@vendra/utils';
 import { revalidatePath } from 'next/cache';
@@ -103,11 +104,23 @@ function readPrice(data: FormData): string | null {
   return kobo && kobo !== '0' ? kobo : null;
 }
 
+/** The usual price shown struck through. Empty means no discount. The API repeats the check. */
+function readWasPrice(data: FormData, priceMinor: string): { ok: true; value: string | null } | { ok: false; message: string } {
+  const raw = text(data, 'wasPrice');
+  if (!raw) return { ok: true, value: null };
+  const value = nairaToKobo(raw);
+  if (!value) return { ok: false, message: 'Enter the was-price in naira, such as 18000, or leave it empty' };
+  if (BigInt(value) <= BigInt(priceMinor)) return { ok: false, message: 'The was-price must be higher than the price, or left empty' };
+  return { ok: true, value };
+}
+
 export async function createListing(productId: string, variantId: string, _state: FormState, data: FormData): Promise<FormState> {
   const priceMinor = readPrice(data);
   if (!priceMinor) return invalid('Enter a price in naira, such as 15000 or 15,000.50');
+  const wasPrice = readWasPrice(data, priceMinor);
+  if (!wasPrice.ok) return invalid(wasPrice.message);
   const result = await session.mutate((api) =>
-    api.POST('/v1/admin/listings', { body: { variantId, priceMinor, currency: 'NGN' } }),
+    api.POST('/v1/admin/listings', { body: { variantId, priceMinor, currency: 'NGN', compareAtMinor: wasPrice.value } }),
   );
   revalidatePath(productPath(productId));
   return toFormState(result, 'Price set. Activate the listing to offer it for sale.');
@@ -116,11 +129,17 @@ export async function createListing(productId: string, variantId: string, _state
 export async function setListingPrice(productId: string, listingId: string, _state: FormState, data: FormData): Promise<FormState> {
   const priceMinor = readPrice(data);
   if (!priceMinor) return invalid('Enter a price in naira, such as 15000 or 15,000.50');
+  const wasPrice = readWasPrice(data, priceMinor);
+  if (!wasPrice.ok) return invalid(wasPrice.message);
   const result = await session.mutate((api) =>
-    api.PUT('/v1/admin/listings/{id}/price', { params: { path: { id: listingId } }, body: { priceMinor, currency: 'NGN' } }),
+    api.PUT('/v1/admin/listings/{id}/price', {
+      params: { path: { id: listingId } },
+      // An empty was-price sends null, which removes the discount.
+      body: { priceMinor, currency: 'NGN', compareAtMinor: wasPrice.value },
+    }),
   );
   revalidatePath(productPath(productId));
-  return toFormState(result, 'Price updated');
+  return toFormState(result, wasPrice.value ? 'Price and was-price updated' : 'Price updated');
 }
 
 export async function setListingActive(productId: string, listingId: string, active: boolean, _state: FormState): Promise<FormState> {
@@ -157,4 +176,55 @@ export async function adjustStock(productId: string, listingId: string, _state: 
   );
   revalidatePath(productPath(productId));
   return toFormState(result, result.ok ? `Stock updated. ${result.data.available} available.` : '');
+}
+
+const MAX_PHOTOS = 10;
+
+/** Uploads one or more photos from the computer, in the order chosen. */
+export async function uploadPhotos(productId: string, room: number, _state: FormState, data: FormData): Promise<FormState> {
+  const files = data.getAll('files').filter((file): file is File => file instanceof File && file.size > 0);
+  if (files.length === 0) return invalid('Choose one or more photos');
+  if (files.length > room) return invalid(room === 0 ? `A product can have at most ${MAX_PHOTOS} photos. Remove one first.` : `There is room for ${room} more ${room === 1 ? 'photo' : 'photos'}.`);
+  let added = 0;
+  for (const file of files) {
+    const form = new FormData();
+    form.set('file', file, file.name);
+    const result = await session.mutate((api) =>
+      api.POST('/v1/admin/products/{id}/images', {
+        params: { path: { id: productId } },
+        // The generated type describes the parts; the client sends the FormData as it is.
+        body: form as unknown as components['schemas']['UploadPhotoDto'],
+        bodySerializer: (body) => body as unknown as FormData,
+      }),
+    );
+    if (!result.ok) {
+      revalidatePath(productPath(productId));
+      return invalid(added ? `${added} added. ${file.name}: ${result.message}` : `${file.name}: ${result.message}`);
+    }
+    added++;
+  }
+  revalidatePath(productPath(productId));
+  return { status: 'success', message: added === 1 ? 'Photo added.' : `${added} photos added.` };
+}
+
+export async function addPhotoFromUrl(productId: string, _state: FormState, data: FormData): Promise<FormState> {
+  const url = text(data, 'url');
+  if (!url) return invalid('Enter the photo address');
+  const result = await session.mutate((api) =>
+    api.POST('/v1/admin/products/{id}/images/from-url', { params: { path: { id: productId } }, body: { url } }),
+  );
+  revalidatePath(productPath(productId));
+  return toFormState(result, 'Photo added.');
+}
+
+/**
+ * Saves a new order, or a removal. The page works out the list; the API accepts only photos the
+ * product has. Success shows as the new order itself, so only failures carry a message.
+ */
+export async function arrangePhotos(productId: string, images: string[], _state: FormState): Promise<FormState> {
+  const result = await session.mutate((api) =>
+    api.PUT('/v1/admin/products/{id}/images', { params: { path: { id: productId } }, body: { images } }),
+  );
+  revalidatePath(productPath(productId));
+  return result.ok ? { status: 'success' } : invalid(result.message);
 }

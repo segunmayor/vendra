@@ -1,14 +1,16 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import { CurrentPrincipal, RequirePermission, Surface } from '../../../platform/http/auth.decorators';
 import { ZodPipe } from '../../../platform/http/zod.pipe';
 import { Principal } from '../../../shared-kernel';
 import { ListingService, ListingState } from '../application/listings';
 
+const minor = z.string().regex(/^\d{1,15}$/, 'Amounts must be a whole number of kobo, as a string');
 const priceSchema = z.object({
-  priceMinor: z.string().regex(/^\d{1,15}$/, 'priceMinor must be a whole number of kobo, as a string'),
+  priceMinor: minor,
   currency: z.string().length(3),
+  compareAtMinor: minor.nullable().optional(),
 });
 const createSchema = priceSchema.extend({ variantId: z.uuid() });
 const id = new ZodPipe(z.uuid());
@@ -23,6 +25,8 @@ export class ListingResponse {
   @ApiProperty() variantId!: string;
   @ApiProperty() sellerId!: string;
   @ApiProperty({ type: MoneyResponse }) price!: MoneyResponse;
+  @ApiPropertyOptional({ type: MoneyResponse, nullable: true, description: 'The usual price, shown struck through' })
+  compareAt!: MoneyResponse | null;
   @ApiProperty({ enum: ['draft', 'active', 'inactive'] }) status!: string;
   @ApiProperty() version!: number;
 }
@@ -30,6 +34,8 @@ export class ListingResponse {
 export class PriceDto {
   @ApiProperty({ example: '1500000' }) priceMinor!: string;
   @ApiProperty({ example: 'NGN' }) currency!: string;
+  @ApiPropertyOptional({ type: String, nullable: true, example: '1800000', description: 'The usual price. Omit to keep it, null to remove the discount.' })
+  compareAtMinor?: string | null;
 }
 
 export class CreateListingDto extends PriceDto {
@@ -41,6 +47,7 @@ const toResponse = (state: ListingState): ListingResponse => ({
   variantId: state.variantId,
   sellerId: state.sellerId,
   price: { amountMinor: state.price.minor.toString(), currency: state.price.currency },
+  compareAt: state.compareAt ? { amountMinor: state.compareAt.minor.toString(), currency: state.compareAt.currency } : null,
   status: state.status,
   version: state.version,
 });

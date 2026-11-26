@@ -1563,6 +1563,662 @@
         ]
       }
     },
+    "/v1/admin/products/{id}/images": {
+      "post": {
+        "operationId": "adminUploadProductImage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadPhotoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a photo from the computer, after the others",
+        "tags": [
+          "admin catalogue"
+        ]
+      },
+      "put": {
+        "operationId": "adminArrangeProductImages",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArrangePhotosDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reorder or remove photos. The first is the main photo.",
+        "tags": [
+          "admin catalogue"
+        ]
+      }
+    },
+    "/v1/admin/products/{id}/images/from-url": {
+      "post": {
+        "operationId": "adminAddProductImageFromUrl",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoFromUrlDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Download a photo from a web address and add it after the others",
+        "tags": [
+          "admin catalogue"
+        ]
+      }
+    },
+    "/v1/store/media/{file}": {
+      "get": {
+        "operationId": "storeGetMedia",
+        "parameters": [
+          {
+            "name": "file",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/avif": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "summary": "A product photo, by the file name in a product image address",
+        "tags": [
+          "store catalogue"
+        ]
+      }
+    },
+    "/v1/admin/storage/types": {
+      "get": {
+        "operationId": "adminStorageTypes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StorageTypeResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The storage services Vendra can use, and the settings each needs",
+        "tags": [
+          "admin storage"
+        ]
+      }
+    },
+    "/v1/admin/storage/locations": {
+      "get": {
+        "operationId": "adminStorageOverview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageOverviewResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin storage"
+        ]
+      },
+      "post": {
+        "operationId": "adminCreateStorageLocation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLocationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageLocationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Adds a location. It is not used until it is made active.",
+        "tags": [
+          "admin storage"
+        ]
+      }
+    },
+    "/v1/admin/storage/locations/{id}": {
+      "get": {
+        "operationId": "adminGetStorageLocation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageLocationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin storage"
+        ]
+      },
+      "put": {
+        "operationId": "adminUpdateStorageLocation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationInputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageLocationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "For the active location, the new settings must pass a check first",
+        "tags": [
+          "admin storage"
+        ]
+      },
+      "delete": {
+        "operationId": "adminRemoveStorageLocation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Only a location that is not active and holds no files",
+        "tags": [
+          "admin storage"
+        ]
+      }
+    },
+    "/v1/admin/storage/locations/{id}/test": {
+      "post": {
+        "operationId": "adminTestStorageLocation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageLocationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Writes, reads back and deletes a small file. The outcome is in lastCheck.",
+        "tags": [
+          "admin storage"
+        ]
+      }
+    },
+    "/v1/admin/storage/locations/{id}/activate": {
+      "post": {
+        "operationId": "adminActivateStorageLocation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageLocationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "New files go here from now on. Must pass a check first.",
+        "tags": [
+          "admin storage"
+        ]
+      }
+    },
+    "/v1/admin/storage/database/activate": {
+      "post": {
+        "operationId": "adminUseDatabaseStorage",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "New files are kept in the database again",
+        "tags": [
+          "admin storage"
+        ]
+      }
+    },
+    "/v1/admin/storage/moves/summary": {
+      "get": {
+        "operationId": "adminStorageMoveSummary",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoveSummaryResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "What is not yet in the active location, and any move in progress",
+        "tags": [
+          "admin storage"
+        ]
+      }
+    },
+    "/v1/admin/storage/moves": {
+      "get": {
+        "operationId": "adminListStorageMoves",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MoveJobResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin storage"
+        ]
+      },
+      "post": {
+        "operationId": "adminStartStorageMove",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartMoveDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoveJobResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Moves every file not yet in the active location into it, in the background",
+        "tags": [
+          "admin storage"
+        ]
+      }
+    },
+    "/v1/admin/storage/moves/{id}": {
+      "get": {
+        "operationId": "adminGetStorageMove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoveJobResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin storage"
+        ]
+      }
+    },
+    "/v1/admin/storage/moves/{id}/cancel": {
+      "post": {
+        "operationId": "adminCancelStorageMove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoveJobResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Stops after the current file. Files already moved stay moved.",
+        "tags": [
+          "admin storage"
+        ]
+      }
+    },
     "/v1/admin/listings": {
       "get": {
         "operationId": "adminListListings",
@@ -3991,6 +4647,363 @@
           "admin sellers"
         ]
       }
+    },
+    "/v1/admin/product-imports/columns": {
+      "get": {
+        "operationId": "adminImportColumns",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ImportColumnResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every column a product file may have",
+        "tags": [
+          "admin product imports"
+        ]
+      }
+    },
+    "/v1/admin/product-imports/template": {
+      "get": {
+        "operationId": "adminImportTemplate",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A CSV template with example rows",
+        "tags": [
+          "admin product imports"
+        ]
+      }
+    },
+    "/v1/admin/product-imports": {
+      "post": {
+        "operationId": "adminUploadImport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadImportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Check a product file. Nothing is created until the import is started.",
+        "tags": [
+          "admin product imports"
+        ]
+      },
+      "get": {
+        "operationId": "adminListImports",
+        "parameters": [
+          {
+            "name": "before",
+            "required": false,
+            "in": "query",
+            "description": "createdAt of the last import on the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ImportJobResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin product imports"
+        ]
+      }
+    },
+    "/v1/admin/product-imports/{id}": {
+      "get": {
+        "operationId": "adminGetImport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "admin product imports"
+        ]
+      }
+    },
+    "/v1/admin/product-imports/{id}/items": {
+      "get": {
+        "operationId": "adminListImportItems",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "required": false,
+            "in": "query",
+            "description": "position of the last item on the previous page",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "invalid",
+                "ready",
+                "skipped",
+                "imported",
+                "failed"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ImportItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Products in the file, in file order, with what happened to each",
+        "tags": [
+          "admin product imports"
+        ]
+      }
+    },
+    "/v1/admin/product-imports/{id}/report": {
+      "get": {
+        "operationId": "adminImportReport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every problem and warning as CSV, to fix in a spreadsheet",
+        "tags": [
+          "admin product imports"
+        ]
+      }
+    },
+    "/v1/admin/product-imports/{id}/start": {
+      "post": {
+        "operationId": "adminStartImport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Import the products that passed the checks",
+        "tags": [
+          "admin product imports"
+        ]
+      }
+    },
+    "/v1/admin/product-imports/{id}/cancel": {
+      "post": {
+        "operationId": "adminCancelImport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Stop before the next product. Products already imported stay.",
+        "tags": [
+          "admin product imports"
+        ]
+      }
     }
   },
   "info": {
@@ -4883,6 +5896,13 @@
               "$ref": "#/components/schemas/VariantResponse"
             }
           },
+          "images": {
+            "description": "Photo addresses in display order; the first is the main photo. /media/... addresses are served by each portal.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "version": {
             "type": "number"
           }
@@ -4896,6 +5916,7 @@
           "attributes",
           "status",
           "variants",
+          "images",
           "version"
         ]
       },
@@ -4942,6 +5963,453 @@
           "weightGrams"
         ]
       },
+      "UploadPhotoDto": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "A JPEG, PNG, GIF, WebP or AVIF photo"
+          }
+        },
+        "required": [
+          "file"
+        ]
+      },
+      "PhotoFromUrlDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "A direct https:// link to the photo file"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "ArrangePhotosDto": {
+        "type": "object",
+        "properties": {
+          "images": {
+            "description": "The photos to keep, in display order. Only photos the product already has.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "images"
+        ]
+      },
+      "FieldSpecResponse": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "help": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "default": {
+            "type": "string"
+          },
+          "placeholder": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "text",
+              "url",
+              "boolean",
+              "email"
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "help",
+          "required"
+        ]
+      },
+      "StorageTypeResponse": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "config": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldSpecResponse"
+            }
+          },
+          "credentials": {
+            "description": "Never returned once saved; see secretHints",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldSpecResponse"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "label",
+          "description",
+          "config",
+          "credentials"
+        ]
+      },
+      "CheckResponse": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "at",
+          "ok"
+        ]
+      },
+      "UsageResponse": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "number"
+          },
+          "bytes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "files",
+          "bytes"
+        ]
+      },
+      "StorageLocationResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "config": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "secretHints": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Last four characters of each saved credential"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "lastCheck": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CheckResponse"
+              }
+            ]
+          },
+          "version": {
+            "type": "number"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/UsageResponse"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "name",
+          "config",
+          "secretHints",
+          "active",
+          "version"
+        ]
+      },
+      "StorageOverviewResponse": {
+        "type": "object",
+        "properties": {
+          "activeId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null while new files are kept in the database"
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorageLocationResponse"
+            }
+          }
+        },
+        "required": [
+          "locations"
+        ]
+      },
+      "CreateLocationDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "config": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "credentials": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Blank or missing fields keep the saved value"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "config",
+          "credentials",
+          "type"
+        ]
+      },
+      "LocationInputDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "config": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "credentials": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Blank or missing fields keep the saved value"
+          }
+        },
+        "required": [
+          "name",
+          "config",
+          "credentials"
+        ]
+      },
+      "SizeResponse": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "number"
+          },
+          "bytes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "files",
+          "bytes"
+        ]
+      },
+      "MoveProblemResponse": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "product-media",
+              "seller-documents"
+            ]
+          },
+          "rowId": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "purpose",
+          "rowId",
+          "message"
+        ]
+      },
+      "MoveJobResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "targetLocationId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "cancelled",
+              "failed"
+            ]
+          },
+          "deleteOld": {
+            "type": "boolean"
+          },
+          "total": {
+            "type": "number",
+            "description": "Files that needed moving when the move started"
+          },
+          "moved": {
+            "type": "number"
+          },
+          "skipped": {
+            "type": "number",
+            "description": "Already there, or changed while being moved"
+          },
+          "failed": {
+            "type": "number",
+            "description": "Left where they were; they still work"
+          },
+          "movedBytes": {
+            "type": "number"
+          },
+          "problems": {
+            "description": "The latest problems, newest first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MoveProblemResponse"
+            }
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "finishedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "targetLocationId",
+          "status",
+          "deleteOld",
+          "total",
+          "moved",
+          "skipped",
+          "failed",
+          "movedBytes",
+          "problems",
+          "createdAt"
+        ]
+      },
+      "MoveSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "activeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "database": {
+            "description": "Files still in this server’s database",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SizeResponse"
+              }
+            ]
+          },
+          "otherLocations": {
+            "description": "Files in storage locations other than the active one",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SizeResponse"
+              }
+            ]
+          },
+          "running": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MoveJobResponse"
+              }
+            ]
+          }
+        },
+        "required": [
+          "database",
+          "otherLocations"
+        ]
+      },
+      "StartMoveDto": {
+        "type": "object",
+        "properties": {
+          "deleteOld": {
+            "type": "boolean",
+            "default": true,
+            "description": "Delete the copy in an earlier storage location once a file is moved. Files in the database are always cleared from it."
+          }
+        }
+      },
       "MoneyResponse": {
         "type": "object",
         "properties": {
@@ -4975,6 +6443,16 @@
           "price": {
             "$ref": "#/components/schemas/MoneyResponse"
           },
+          "compareAt": {
+            "nullable": true,
+            "description": "The usual price, shown struck through",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MoneyResponse"
+              }
+            ]
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -5007,6 +6485,12 @@
             "type": "string",
             "example": "NGN"
           },
+          "compareAtMinor": {
+            "type": "string",
+            "nullable": true,
+            "example": "1800000",
+            "description": "The usual price. Omit to keep it, null to remove the discount."
+          },
           "variantId": {
             "type": "string"
           }
@@ -5027,6 +6511,12 @@
           "currency": {
             "type": "string",
             "example": "NGN"
+          },
+          "compareAtMinor": {
+            "type": "string",
+            "nullable": true,
+            "example": "1800000",
+            "description": "The usual price. Omit to keep it, null to remove the discount."
           }
         },
         "required": [
@@ -5247,6 +6737,16 @@
           "priceTo": {
             "$ref": "#/components/schemas/MoneyDto"
           },
+          "compareAt": {
+            "nullable": true,
+            "description": "Usual price of the cheapest variant, when discounted",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MoneyDto"
+              }
+            ]
+          },
           "availability": {
             "type": "string",
             "enum": [
@@ -5308,6 +6808,16 @@
           },
           "price": {
             "$ref": "#/components/schemas/MoneyDto"
+          },
+          "compareAt": {
+            "nullable": true,
+            "description": "The usual price, when discounted",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MoneyDto"
+              }
+            ]
           },
           "availability": {
             "type": "string",
@@ -7954,6 +9464,306 @@
         },
         "required": [
           "decision"
+        ]
+      },
+      "ImportColumnResponse": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "product",
+              "variant"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          },
+          "example": {
+            "type": "string"
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "level",
+          "required",
+          "description",
+          "example",
+          "aliases"
+        ]
+      },
+      "UploadImportDto": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "A .csv file"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "create_only",
+              "create_and_update"
+            ],
+            "description": "create_only leaves existing products alone"
+          }
+        },
+        "required": [
+          "file"
+        ]
+      },
+      "IssueResponse": {
+        "type": "object",
+        "properties": {
+          "line": {
+            "type": "number",
+            "nullable": true,
+            "description": "Line in the file; 1 is the header"
+          },
+          "field": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "SummaryResponse": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "number"
+          },
+          "products": {
+            "type": "number"
+          },
+          "variants": {
+            "type": "number"
+          },
+          "creates": {
+            "type": "number"
+          },
+          "updates": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "rows",
+          "products",
+          "variants",
+          "creates",
+          "updates"
+        ]
+      },
+      "CountsResponse": {
+        "type": "object",
+        "properties": {
+          "invalid": {
+            "type": "number"
+          },
+          "ready": {
+            "type": "number"
+          },
+          "skipped": {
+            "type": "number"
+          },
+          "imported": {
+            "type": "number"
+          },
+          "failed": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "invalid",
+          "ready",
+          "skipped",
+          "imported",
+          "failed"
+        ]
+      },
+      "ImportJobResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "csv"
+            ]
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "number"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "create_only",
+              "create_and_update"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "validated",
+              "queued",
+              "running",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "issues": {
+            "description": "Problems with the whole file. If any, the import cannot start.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueResponse"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueResponse"
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/SummaryResponse"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/CountsResponse"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "finishedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "format",
+          "fileName",
+          "sizeBytes",
+          "mode",
+          "status",
+          "issues",
+          "warnings",
+          "summary",
+          "counts",
+          "createdBy",
+          "createdAt"
+        ]
+      },
+      "ImportItemResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "position": {
+            "type": "number"
+          },
+          "handle": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "skus": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "update",
+              "skip"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "invalid",
+              "ready",
+              "skipped",
+              "imported",
+              "failed"
+            ]
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueResponse"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueResponse"
+            }
+          },
+          "productId": {
+            "type": "string",
+            "nullable": true
+          },
+          "processedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "position",
+          "handle",
+          "name",
+          "lines",
+          "skus",
+          "action",
+          "status",
+          "errors",
+          "warnings"
         ]
       }
     }

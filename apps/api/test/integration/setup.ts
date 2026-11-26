@@ -9,6 +9,8 @@ beforeAll(async () => {
   const prisma = new PrismaClient();
   try {
     await prisma.loginFailure.deleteMany({ where: { key: { startsWith: 'ip:register:' } } });
+    // Files stay in the database unless a suite chooses a storage location (storage.int-spec.ts).
+    await prisma.storageLocation.updateMany({ where: { active: true }, data: { active: false } });
   } finally {
     await prisma.$disconnect();
   }

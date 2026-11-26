@@ -59,6 +59,7 @@ const PUBLIC_ROUTES = [
   'GET /store/categories',
   'GET /store/products',
   'GET /store/products/:slug',
+  'GET /store/media/:file',
   'POST /admin/auth/login',
   'POST /admin/auth/refresh',
   'POST /admin/auth/logout',

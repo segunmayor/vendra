@@ -13,6 +13,7 @@ const toListing = (row: Row): Listing =>
     variantId: row.variantId,
     sellerId: row.sellerId,
     price: Money.of(row.priceMinor, row.currency),
+    compareAt: row.compareAtMinor === null ? null : Money.of(row.compareAtMinor, row.currency),
     status: row.status as ListingStatus,
     version: row.version,
   });
@@ -37,7 +38,12 @@ export class PrismaListingRepository implements ListingRepository {
   async save(listing: Listing, audit: AuditEntry): Promise<void> {
     const state = listing.snapshot;
     const events = listing.pullEvents();
-    const fields = { priceMinor: state.price.minor, currency: state.price.currency, status: state.status };
+    const fields = {
+      priceMinor: state.price.minor,
+      compareAtMinor: state.compareAt?.minor ?? null,
+      currency: state.price.currency,
+      status: state.status,
+    };
     try {
       await this.prisma.$transaction(async (tx) => {
         if (state.version === 0) {

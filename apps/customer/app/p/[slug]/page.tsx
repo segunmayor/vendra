@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AddToCart } from '../../../components/add-to-cart';
-import { AvailabilityBadge, Price, ProductImage } from '../../../components/catalogue';
+import { AvailabilityBadge, Price, ProductImage, WasPrice } from '../../../components/catalogue';
 import { SiteHeader } from '../../../components/site-header';
 import { getProduct, type ProductDetail } from '../../../lib/catalogue';
 
@@ -94,6 +94,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
               <span className="text-3xl font-bold tabular-nums">
                 {formatMoney(selected.offer.price.amountMinor, selected.offer.price.currency)}
               </span>
+              {selected.offer.compareAt ? <WasPrice value={selected.offer.compareAt} className="text-lg" /> : null}
               <AvailabilityBadge availability={selected.offer.availability} quantity={selected.offer.lowStockQuantity} />
             </div>
             {priceVaries ? (

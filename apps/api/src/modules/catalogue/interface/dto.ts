@@ -87,6 +87,8 @@ export class ProductResponse {
   attributes!: Record<string, string | number | boolean>;
   @ApiProperty({ enum: ['draft', 'published', 'archived'] }) status!: string;
   @ApiProperty({ type: [VariantResponse] }) variants!: VariantResponse[];
+  @ApiProperty({ type: [String], description: 'Photo addresses in display order; the first is the main photo. /media/... addresses are served by each portal.' })
+  images!: string[];
   @ApiProperty() version!: number;
 }
 

@@ -4,6 +4,7 @@ export const PERMISSION_LABEL: Record<string, string> = {
   'roles.manage': 'Create roles',
   'audit.read': 'Read the audit log',
   'catalogue.manage': 'Products, categories, brands and prices',
+  'catalogue.import': 'Upload product files that create products, prices and stock in bulk',
   'inventory.manage': 'Warehouses and stock',
   'orders.manage': 'See and manage orders',
   'orders.refund': 'Refund customers',

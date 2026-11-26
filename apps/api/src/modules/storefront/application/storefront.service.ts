@@ -12,6 +12,8 @@ const MAX_ROUNDS = 4;
 export interface Offer {
   readonly listingId: string;
   readonly price: Money;
+  /** The usual price, shown struck through when the item is discounted. */
+  readonly compareAt: Money | null;
   readonly availability: Availability;
   /** Shown only for low stock, so exact stock levels are not disclosed. */
   readonly lowStockQuantity: number | null;
@@ -26,6 +28,8 @@ export interface ProductCard {
   readonly image: string | null;
   readonly priceFrom: Money;
   readonly priceTo: Money;
+  /** The usual price of the cheapest variant, when that variant is discounted. */
+  readonly compareAt: Money | null;
   readonly availability: Availability;
 }
 
@@ -129,7 +133,7 @@ export class StorefrontService {
     return new Map(
       [...cheapest].map(([variantId, offer]) => [
         variantId,
-        { listingId: offer.listingId, price: offer.price, ...availabilityOf(stock.get(offer.listingId) ?? 0, lowStock) },
+        { listingId: offer.listingId, price: offer.price, compareAt: offer.compareAt, ...availabilityOf(stock.get(offer.listingId) ?? 0, lowStock) },
       ]),
     );
   }
@@ -138,6 +142,7 @@ export class StorefrontService {
     const sellable = product.variants.map((variant) => offers.get(variant.id)).filter((offer): offer is Offer => !!offer);
     if (sellable.length === 0) return null;
     const prices = sellable.map((offer) => offer.price);
+    const cheapest = sellable.reduce((low, offer) => (offer.price.minor < low.price.minor ? offer : low));
     return {
       id: product.id,
       slug: product.slug,
@@ -147,6 +152,7 @@ export class StorefrontService {
       image: product.images[0] ?? null,
       priceFrom: prices.reduce((low, price) => (price.minor < low.minor ? price : low)),
       priceTo: prices.reduce((high, price) => (price.minor > high.minor ? price : high)),
+      compareAt: cheapest.compareAt,
       availability: best(sellable),
     };
   }

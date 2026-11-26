@@ -12,6 +12,10 @@ const schema = z.object({
   RESERVATION_SWEEP_SECONDS: z.coerce.number().int().min(0).max(3600).default(60),
   /** How often committed events are delivered to other modules. 0 turns polling off (tests drain directly). */
   OUTBOX_POLL_MS: z.coerce.number().int().min(0).max(60_000).default(2000),
+  /** How often queued product imports are looked for. 0 turns polling off (tests run them directly). */
+  IMPORT_POLL_MS: z.coerce.number().int().min(0).max(60_000).default(3000),
+  /** How often to look for file moves to run. 0 turns the worker off (tests run it directly). */
+  STORAGE_MOVE_POLL_MS: z.coerce.number().int().min(0).max(60_000).default(3000),
   /**
    * Encrypts credentials staff enter in the admin portal, such as gateway secret keys.
    * 32 random bytes, base64. Generate with: openssl rand -base64 32. Changing it makes saved

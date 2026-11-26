@@ -42,6 +42,32 @@ export function text(values: PublicSettings, key: string, fallback = ''): string
   return typeof value === 'string' ? value : fallback;
 }
 
+const MEDIA_FILE = /^[0-9a-f-]{36}\.(?:jpg|png|gif|webp|avif)$/;
+
+/**
+ * GET handler body for app/media/[file]/route.ts: a product photo from the API, served from the
+ * portal's own address so product image paths ("/media/<id>.jpg") work in every portal.
+ */
+export async function mediaFile(file: string): Promise<Response> {
+  if (!MEDIA_FILE.test(file)) return new Response('Not found', { status: 404 });
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${settings().apiBaseUrl}/v1/store/media/${file}`, { cache: 'no-store' });
+  } catch {
+    return new Response('Unavailable', { status: 503 });
+  }
+  if (!upstream.ok || !upstream.body) return new Response('Not found', { status: upstream.status === 404 ? 404 : 502 });
+  return new Response(upstream.body, {
+    headers: {
+      'content-type': upstream.headers.get('content-type') ?? 'application/octet-stream',
+      // A stored photo never changes; a new photo gets a new name.
+      'cache-control': 'public, max-age=31536000, immutable',
+      'x-content-type-options': 'nosniff',
+      'content-security-policy': "default-src 'none'; sandbox",
+    },
+  });
+}
+
 export type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; message: string };
 
 /** Thrown when the API refuses a refresh token: the session is over and the user must sign in. */
