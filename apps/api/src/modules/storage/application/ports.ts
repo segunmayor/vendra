@@ -7,6 +7,8 @@ export type { DriverKind, FieldSpec, FilePurpose, LocationCheck, LocationState, 
 export interface StorageDriver {
   put(key: string, content: Uint8Array, contentType: string): Promise<void>;
   get(key: string): Promise<Uint8Array>;
+  /** Bytes start to end (both included), for video seeking. Drivers without it read the whole file. */
+  getRange?(key: string, start: number, end: number): Promise<Uint8Array>;
   delete(key: string): Promise<void>;
   /** Releases connections. Called when a location's settings change. */
   close?(): Promise<void>;

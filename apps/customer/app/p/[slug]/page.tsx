@@ -84,7 +84,21 @@ export default async function ProductPage({ params, searchParams }: Props) {
         </nav>
 
         <div className="grid gap-8 md:grid-cols-2 md:gap-12">
-          <ProductImage src={product.images[0] ?? null} name={product.name} />
+          <div className="space-y-4">
+            <ProductImage src={product.images[0] ?? null} name={product.name} />
+            {product.videos.map((video, index) => (
+              <video
+                key={video}
+                src={video}
+                controls
+                playsInline
+                preload="metadata"
+                poster={product.images[0]}
+                className="aspect-video w-full rounded-brand bg-black"
+                aria-label={product.videos.length > 1 ? `${product.name}: video ${index + 1}` : `${product.name}: video`}
+              />
+            ))}
+          </div>
 
           <div>
             {product.brand ? <div className="text-sm font-medium tracking-wide text-muted uppercase">{product.brand.name}</div> : null}

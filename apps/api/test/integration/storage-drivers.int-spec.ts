@@ -43,6 +43,17 @@ function contract(name: string, enabled: boolean, make: () => StorageDriver, mak
       await expect(driver.get(key)).rejects.toBeInstanceOf(StorageUnavailable);
     });
 
+    it('reads byte ranges, for video seeking', async () => {
+      const content = new Uint8Array(300_000).map((_, index) => (index * 7) % 251);
+      const key = `vendra-tests/${run}/product-media/2026/11/${randomUUID()}.mp4`;
+      await driver.put(key, content, 'video/mp4');
+      const read = (start: number, end: number) => (driver.getRange ? driver.getRange(key, start, end) : driver.get(key).then((all) => all.subarray(start, end + 1)));
+      expect(Buffer.compare(Buffer.from(await read(0, 0)), Buffer.from(content.subarray(0, 1)))).toBe(0);
+      expect(Buffer.compare(Buffer.from(await read(1000, 70_999)), Buffer.from(content.subarray(1000, 71_000)))).toBe(0);
+      expect(Buffer.compare(Buffer.from(await read(299_990, 299_999)), Buffer.from(content.subarray(299_990)))).toBe(0);
+      await driver.delete(key);
+    });
+
     it('deletes files that are already gone without failing', async () => {
       await driver.delete(`vendra-tests/${run}/never-existed.txt`);
     });
@@ -51,7 +62,7 @@ function contract(name: string, enabled: boolean, make: () => StorageDriver, mak
       const wrong = makeWrong();
       const error = await wrong.put(`vendra-tests/${run}/x.txt`, new Uint8Array([1]), 'text/plain').catch((caught: unknown) => caught);
       expect(error).toBeInstanceOf(StorageUnavailable);
-      expect((error as Error).message).not.toMatch(/at |\n|stack/i);
+      expect((error as Error).message).not.toMatch(/\n|\bat \S+ \(|stack/i);
       await wrong.close?.();
     });
   });

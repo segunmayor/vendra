@@ -16,6 +16,7 @@ import { SettingsReader } from '../settings';
 import { CatalogueController } from './interface/catalogue.controller';
 import { MediaController } from './interface/media.controller';
 import { ProductPhotosController } from './interface/product-photos.controller';
+import { ProductVideosController } from './interface/product-videos.controller';
 import { ProductMediaService } from './application/media';
 import { PrismaMediaStore, ProductMediaFiles, sha256Hasher } from './infrastructure/prisma-media.store';
 import { SafeRemoteFiles } from './infrastructure/safe-remote-files';
@@ -25,7 +26,7 @@ export const REMOTE_FILES = Symbol('REMOTE_FILES');
 
 @Module({
   imports: [StorageModule],
-  controllers: [CatalogueController, ProductPhotosController, MediaController],
+  controllers: [CatalogueController, ProductPhotosController, ProductVideosController, MediaController],
   providers: [
     {
       provide: CatalogueService,

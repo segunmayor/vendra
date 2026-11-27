@@ -16,7 +16,7 @@ export type SettingDefinition =
   | (Base & { readonly kind: 'email' | 'phone' | 'url'; readonly default: string; readonly optional?: boolean })
   | (Base & { readonly kind: 'boolean'; readonly default: boolean });
 
-export type SettingGroup = 'store' | 'shopping' | 'search' | 'security' | 'payments' | 'vendors' | 'imports';
+export type SettingGroup = 'store' | 'shopping' | 'search' | 'security' | 'payments' | 'vendors' | 'imports' | 'media';
 
 export const GROUPS: Record<SettingGroup, { label: string; description: string }> = {
   store: { label: 'Store', description: 'Name, contact details and the words customers see.' },
@@ -26,6 +26,7 @@ export const GROUPS: Record<SettingGroup, { label: string; description: string }
   payments: { label: 'Payments and accounting', description: 'Where customers return after paying, and how payments are recorded in the ledger.' },
   vendors: { label: 'Seller applications', description: 'Whether businesses can apply to sell, and what they must send for verification.' },
   imports: { label: 'Product imports', description: 'Limits for product files uploaded in bulk, and how their photos are fetched.' },
+  media: { label: 'Product videos', description: 'How large product videos can be, and how many each product may have.' },
 };
 
 export const SETTINGS = {
@@ -78,6 +79,8 @@ export const SETTINGS = {
   'imports.allowHttpImages': { group: 'imports', kind: 'boolean', default: false, label: 'Accept photo addresses starting with http://', description: 'Off: only https:// addresses, in Admin and in imports. Turn on only for a supplier that cannot serve https.' },
   'imports.createMissingBrands': { group: 'imports', kind: 'boolean', default: true, label: 'Create brands that do not exist yet', description: 'Off: a product naming an unknown brand is reported as a problem instead.' },
   'imports.requireImageToPublish': { group: 'imports', kind: 'boolean', default: true, label: 'Products need a photo to go on sale', description: 'On: a product whose photos could not be fetched is saved as a draft, with its price and stock, for you to finish.' },
+  'media.maxVideoMb': { group: 'media', kind: 'integer', public: true, min: 1, max: 100, default: 50, unit: 'MB', label: 'Largest video', description: '100 MB is the most the system accepts. Short clips of 30 to 60 seconds are usually well under 50 MB.' },
+  'media.maxVideosPerProduct': { group: 'media', kind: 'integer', public: true, min: 0, max: 5, default: 3, unit: 'videos', label: 'Most videos per product', description: '0 turns product videos off.' },
 } as const satisfies Record<string, SettingDefinition>;
 
 export type SettingKey = keyof typeof SETTINGS;

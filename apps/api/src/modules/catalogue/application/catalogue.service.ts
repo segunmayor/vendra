@@ -1,6 +1,6 @@
 import { ApplicationError, AuditEntry, DomainError, Principal } from '../../../shared-kernel';
 import { assertName, parseAttributeSchema, toSlug } from '../domain/attributes';
-import { MAX_IMAGES, Product, ProductDetails, ProductState, ProductStatus, Variant } from '../domain/product';
+import { MAX_IMAGES, MAX_VIDEOS, Product, ProductDetails, ProductState, ProductStatus, Variant } from '../domain/product';
 import {
   BrandRepository,
   BrandView,
@@ -12,7 +12,7 @@ import {
   ProductSummary,
 } from './ports';
 
-export { MAX_IMAGES };
+export { MAX_IMAGES, MAX_VIDEOS };
 
 const notFound = (what: string) => new ApplicationError('not_found', `${what}.not_found`, `${what[0]?.toUpperCase()}${what.slice(1)} not found`);
 
@@ -108,6 +108,41 @@ export class CatalogueService {
       throw new DomainError('product.unknown_image', 'The photos changed while you were editing. Reload the page and try again.');
     }
     return this.setImages(actor, id, images);
+  }
+
+  /** Refuses before a video is stored when the product already has the most allowed. */
+  async assertRoomForVideo(id: string, limit: number): Promise<void> {
+    const product = await this.load(id);
+    const max = Math.min(limit, MAX_VIDEOS);
+    if (max === 0) throw new DomainError('product.videos_off', 'Product videos are turned off in Settings.');
+    if (product.snapshot.videos.length >= max) throw new DomainError('product.too_many_videos', `A product can have at most ${max} videos. Remove one first.`);
+  }
+
+  async addVideo(actor: Principal, id: string, video: string): Promise<ProductState> {
+    const product = await this.load(id);
+    return this.setVideos(actor, id, [...product.snapshot.videos, video]);
+  }
+
+  /** Reorders or removes videos. Only videos the product already has may be listed. */
+  async arrangeVideos(actor: Principal, id: string, videos: readonly string[]): Promise<ProductState> {
+    const product = await this.load(id);
+    const current = new Set(product.snapshot.videos);
+    if (videos.some((video) => !current.has(video))) {
+      throw new DomainError('product.unknown_video', 'The videos changed while you were editing. Reload the page and try again.');
+    }
+    return this.setVideos(actor, id, videos);
+  }
+
+  private async setVideos(actor: Principal, id: string, videos: readonly string[]): Promise<ProductState> {
+    const product = await this.load(id);
+    const before = product.snapshot.videos;
+    product.setVideos(videos, this.clock.now());
+    if (product.snapshot.videos === before) return product.snapshot;
+    await this.products.save(
+      product,
+      this.audit(actor, 'catalogue.product_videos_set', 'product', id, { videos: [...product.snapshot.videos] }, { videos: [...before] }),
+    );
+    return product.snapshot;
   }
 
   async setImages(actor: Principal, id: string, images: readonly string[]): Promise<ProductState> {

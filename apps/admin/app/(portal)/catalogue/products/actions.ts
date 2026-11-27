@@ -228,3 +228,12 @@ export async function arrangePhotos(productId: string, images: string[], _state:
   revalidatePath(productPath(productId));
   return result.ok ? { status: 'success' } : invalid(result.message);
 }
+
+/** Saves a new video order, or a removal. Only videos the product has are accepted by the API. */
+export async function arrangeVideos(productId: string, videos: string[], _state: FormState): Promise<FormState> {
+  const result = await session.mutate((api) =>
+    api.PUT('/v1/admin/products/{id}/videos', { params: { path: { id: productId } }, body: { videos } }),
+  );
+  revalidatePath(productPath(productId));
+  return result.ok ? { status: 'success' } : invalid(result.message);
+}

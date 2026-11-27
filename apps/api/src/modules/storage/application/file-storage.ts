@@ -54,6 +54,21 @@ export class FileStorage {
     return { objectId: id };
   }
 
+  /** Bytes start to end (both included) of a stored file, without reading all of it where the service allows. */
+  async getRange(objectId: string, start: number, end: number): Promise<Uint8Array | null> {
+    const object = await this.objects.find(objectId);
+    if (!object) return null;
+    const location = await this.locations.find(object.locationId);
+    if (!location) return null;
+    try {
+      const driver = await this.pool.driverFor(location);
+      if (driver.getRange) return await driver.getRange(object.key, start, end);
+      return (await driver.get(object.key)).subarray(start, end + 1);
+    } catch (error) {
+      throw new ApplicationError('unavailable', 'storage.read_failed', `The file could not be read from ${location.name}. ${reason(error)}`);
+    }
+  }
+
   /** Which location holds a stored file. */
   async locationOf(objectId: string): Promise<string | null> {
     return (await this.objects.find(objectId))?.locationId ?? null;

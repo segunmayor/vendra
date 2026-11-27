@@ -125,3 +125,32 @@ describe('Product', () => {
     else expect(toSlug(input)).toBe(expected);
   });
 });
+
+describe('Product videos', () => {
+  const video = (n: number, ext = 'mp4') => `/media/00000000-0000-4000-8000-${String(n).padStart(12, '0')}.${ext}`;
+
+  it('keeps videos in the order given, without duplicates', () => {
+    const product = make();
+    product.setVideos([video(2), video(1, 'webm'), video(2)], now);
+    expect(product.snapshot.videos).toEqual([video(2), video(1, 'webm')]);
+  });
+
+  it('accepts only videos stored by Vendra, up to five', () => {
+    const product = make();
+    expect(() => product.setVideos(['https://www.youtube.com/watch?v=x'], now)).toThrow('uploaded to Vendra');
+    expect(() => product.setVideos([video(1, 'png')], now)).toThrow('uploaded to Vendra');
+    expect(() => product.setVideos([1, 2, 3, 4, 5, 6].map((n) => video(n)), now)).toThrow('at most 5 videos');
+  });
+
+  it('tells the storefront when a published product’s videos change', () => {
+    const product = make({ screen_size: 6.5, network: '4G' });
+    product.addVariant(variant(), now);
+    product.publish(phone, now);
+    product.pullEvents();
+    product.setVideos([video(1)], now);
+    expect(product.pullEvents().map((event) => event.type)).toEqual(['ProductUpdated']);
+    product.setVideos([video(1)], now);
+    expect(product.pullEvents()).toEqual([]);
+  });
+});
+

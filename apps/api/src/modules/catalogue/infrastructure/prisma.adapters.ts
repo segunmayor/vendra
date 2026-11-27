@@ -112,6 +112,7 @@ const toProduct = (row: ProductRow): Product =>
     description: row.description,
     attributes: row.attributes as Record<string, AttributeValue>,
     images: Array.isArray(row.images) ? row.images.filter((image): image is string => typeof image === 'string') : [],
+    videos: Array.isArray(row.videos) ? row.videos.filter((video): video is string => typeof video === 'string') : [],
     status: row.status as ProductStatus,
     version: row.version,
     variants: row.variants.map((variant) => ({
@@ -192,6 +193,7 @@ export class PrismaProductRepository implements ProductRepository {
       brandId: state.brandId,
       attributes: json(state.attributes),
       images: json(state.images),
+      videos: json(state.videos),
       status: state.status,
     };
     const variantRows = state.variants.map((variant) => ({

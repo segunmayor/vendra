@@ -28,6 +28,8 @@ export interface PublishedProduct {
 
 export interface PublishedProductDetail extends PublishedProduct {
   readonly description: string;
+  /** Video addresses, in display order. */
+  readonly videos: readonly string[];
   /** Attribute values with their category labels, in the category's order. */
   readonly attributes: readonly { readonly label: string; readonly value: string }[];
   /** From the top-level category down to the product's own. */
@@ -61,7 +63,7 @@ export interface ProductSearch {
     after: SearchPosition | null,
     limit: number,
   ): Promise<{ items: { product: PublishedProduct; position: SearchPosition }[]; hasMore: boolean }>;
-  findPublishedBySlug(slug: string): Promise<(PublishedProduct & { description: string; attributes: Record<string, AttributeValue> }) | null>;
+  findPublishedBySlug(slug: string): Promise<(PublishedProduct & { description: string; attributes: Record<string, AttributeValue>; videos: readonly string[] }) | null>;
   countPublishedByCategory(): Promise<Map<string, number>>;
   findBrandBySlug(slug: string): Promise<NamedRef | null>;
 }
@@ -200,8 +202,11 @@ export class StorefrontCatalogue {
   async productBySlug(slug: string): Promise<PublishedProductDetail | null> {
     const found = await this.search.findPublishedBySlug(slug);
     if (!found) return null;
-    const [product] = await this.withAddresses([found]);
-    if (!product) return null;
+    const [withPhotos] = await this.withAddresses([found]);
+    if (!withPhotos) return null;
+    // Videos come from the CDN too, where one is set up.
+    const videoAddresses = await this.images.resolve(found.videos);
+    const product = { ...withPhotos, videos: found.videos.map((video) => videoAddresses.get(video) ?? video) };
     const all = await this.categories.list();
     const byId = new Map(all.map((category) => [category.id, category]));
     const breadcrumb: NamedRef[] = [];

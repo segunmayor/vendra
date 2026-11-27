@@ -279,6 +279,9 @@ const EXTENSIONS: Readonly<Record<string, string>> = {
   'image/webp': 'webp',
   'image/avif': 'avif',
   'application/pdf': 'pdf',
+  'video/mp4': 'mp4',
+  'video/webm': 'webm',
+  'video/quicktime': 'mov',
 };
 
 /** The file extension for a checked content type. */

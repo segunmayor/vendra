@@ -20,6 +20,8 @@ export interface ProductState {
   readonly attributes: Readonly<Record<string, AttributeValue>>;
   /** Photo addresses in display order; the first is the main photo. */
   readonly images: readonly string[];
+  /** Video addresses in display order. */
+  readonly videos: readonly string[];
   readonly status: ProductStatus;
   readonly variants: readonly Variant[];
   readonly version: number;
@@ -36,6 +38,10 @@ const SKU = /^[A-Z0-9][A-Z0-9._-]{1,63}$/;
 const MAX_DESCRIPTION = 5000;
 const MAX_VARIANTS = 100;
 export const MAX_IMAGES = 10;
+/** The most the system allows; a setting can lower it. */
+export const MAX_VIDEOS = 5;
+/** A video Vendra stores (see ProductMediaService). */
+const VIDEO = /^\/media\/[0-9a-f-]{36}\.(?:mp4|webm|mov)$/;
 /** A photo Vendra stores (see ProductMediaService), or an https address on another host. */
 const IMAGE = /^(?:\/media\/[0-9a-f-]{36}\.(?:jpg|png|gif|webp|avif)|https:\/\/[^\s"'<>]{4,2000})$/;
 
@@ -65,6 +71,7 @@ export class Product extends AggregateRoot {
       description: assertDescription(input.description),
       attributes: validateAttributes(definitions, input.attributes, false),
       images: [],
+      videos: [],
       status: 'draft',
       variants: [],
       version: 0,
@@ -133,6 +140,16 @@ export class Product extends AggregateRoot {
     if (bad !== undefined) throw new DomainError('product.invalid_image', 'Photos must be uploaded to Vendra or be https addresses');
     if (unique.length === this.state.images.length && unique.every((image, index) => image === this.state.images[index])) return;
     this.state = { ...this.state, images: unique };
+    if (this.state.status === 'published') this.emit('ProductUpdated', now);
+  }
+
+  /** Replaces the videos. The order given is the display order. */
+  setVideos(videos: readonly string[], now: Date): void {
+    const unique = [...new Set(videos)];
+    if (unique.length > MAX_VIDEOS) throw new DomainError('product.too_many_videos', `A product can have at most ${MAX_VIDEOS} videos`);
+    if (unique.some((video) => !VIDEO.test(video))) throw new DomainError('product.invalid_video', 'Videos must be uploaded to Vendra');
+    if (unique.length === this.state.videos.length && unique.every((video, index) => video === this.state.videos[index])) return;
+    this.state = { ...this.state, videos: unique };
     if (this.state.status === 'published') this.emit('ProductUpdated', now);
   }
 

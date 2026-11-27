@@ -34,3 +34,27 @@ export function checkImage(bytes: Uint8Array, maxBytes: number): { contentType: 
   }
   throw new DomainError('media.not_an_image', 'The file is not a JPEG, PNG, GIF, WebP or AVIF photo');
 }
+
+/** Hard ceiling whatever the setting says: a video is held in memory while it is checked and stored. */
+export const VIDEO_HARD_LIMIT_BYTES = 100 * 1024 * 1024;
+
+const VIDEO_TYPES: Readonly<Record<string, string>> = { mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime' };
+
+/** Every file type product media may be, by extension: photos and videos. */
+export const MEDIA_EXTENSIONS: Readonly<Record<string, string>> = { ...IMAGE_EXTENSIONS, ...VIDEO_TYPES };
+
+/**
+ * Accepts MP4 (including M4V), QuickTime MOV and WebM videos, judged by the first bytes rather
+ * than the file name. Browsers play MP4 (H.264) everywhere; MOV and WebM play in most.
+ */
+export function checkVideo(bytes: Uint8Array, maxBytes: number): { contentType: string; extension: string } {
+  if (bytes.length === 0) throw new DomainError('media.empty', 'That file is empty');
+  const limit = Math.min(maxBytes, VIDEO_HARD_LIMIT_BYTES);
+  if (bytes.length > limit) throw new DomainError('media.too_large', `Videos can be up to ${Math.floor(limit / (1024 * 1024))} MB`);
+  if (bytes.length >= 12 && ascii(bytes, 4, 8) === 'ftyp') {
+    const brand = ascii(bytes, 8, 12);
+    return brand === 'qt  ' ? { contentType: 'video/quicktime', extension: 'mov' } : { contentType: 'video/mp4', extension: 'mp4' };
+  }
+  if (bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) return { contentType: 'video/webm', extension: 'webm' };
+  throw new DomainError('media.not_a_video', 'The file is not an MP4, MOV or WebM video');
+}

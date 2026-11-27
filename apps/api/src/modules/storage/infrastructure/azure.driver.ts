@@ -48,6 +48,13 @@ export class AzureBlobDriver implements StorageDriver {
     return new Uint8Array(buffer);
   }
 
+  async getRange(key: string, start: number, end: number): Promise<Uint8Array> {
+    const buffer = await this.run(() =>
+      this.container.getBlockBlobClient(key).downloadToBuffer(start, end - start + 1, { abortSignal: AbortSignal.timeout(TIMEOUT_MS) }),
+    );
+    return new Uint8Array(buffer);
+  }
+
   async delete(key: string): Promise<void> {
     await this.run(() => this.container.getBlockBlobClient(key).deleteIfExists({ abortSignal: AbortSignal.timeout(TIMEOUT_MS) }));
   }

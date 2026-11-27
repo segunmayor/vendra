@@ -81,6 +81,7 @@ export class ProductDetailResponse {
   @ApiProperty({ type: RefDto }) category!: RefDto;
   @ApiProperty({ type: [RefDto] }) breadcrumb!: RefDto[];
   @ApiProperty({ type: [String] }) images!: string[];
+  @ApiProperty({ type: [String], description: 'Video addresses in display order. Play with <video>; byte ranges are supported.' }) videos!: string[];
   @ApiProperty({ type: [AttributeDto] }) attributes!: AttributeDto[];
   @ApiProperty({ type: MoneyDto }) priceFrom!: MoneyDto;
   @ApiProperty({ type: MoneyDto }) priceTo!: MoneyDto;
@@ -100,6 +101,7 @@ const card = (value: ProductCard): ProductCardResponse => ({
 const detail = (value: ProductPage): ProductDetailResponse => ({
   ...value,
   images: [...value.images],
+  videos: [...value.videos],
   breadcrumb: [...value.breadcrumb],
   attributes: [...value.attributes],
   priceFrom: money(value.priceFrom),

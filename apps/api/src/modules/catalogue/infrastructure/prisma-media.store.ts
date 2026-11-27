@@ -1,11 +1,11 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { Hasher, MediaStore, StoredMedia } from '../application/ports';
-import { IMAGE_EXTENSIONS } from '../domain/image-file';
+import { MEDIA_EXTENSIONS } from '../domain/image-file';
 import { FileHolder, FileStorage, HeldFile } from '../../storage';
 
 const extensionOf = (contentType: string): string =>
-  Object.entries(IMAGE_EXTENSIONS).find(([, type]) => type === contentType)?.[0] ?? 'bin';
+  Object.entries(MEDIA_EXTENSIONS).find(([, type]) => type === contentType)?.[0] ?? 'bin';
 
 const view = (row: { id: string; contentType: string }): StoredMedia => ({ id: row.id, contentType: row.contentType, extension: extensionOf(row.contentType) });
 
@@ -47,6 +47,21 @@ export class PrismaMediaStore implements MediaStore {
       }
       throw error;
     }
+  }
+
+  async info(id: string): Promise<{ contentType: string; sizeBytes: number } | null> {
+    return this.prisma.productMedia.findUnique({ where: { id }, select: { contentType: true, sizeBytes: true } });
+  }
+
+  async readRange(id: string, start: number, end: number): Promise<Uint8Array | null> {
+    // Only the bytes asked for leave the database, even for a large video.
+    const rows = await this.prisma.$queryRaw<{ part: Buffer | null; storageObjectId: string | null }[]>`
+      SELECT substring("content" FROM ${start + 1}::int FOR ${end - start + 1}::int) AS "part", "storageObjectId"
+      FROM "catalogue"."product_media" WHERE "id" = ${id}::uuid`;
+    const row = rows[0];
+    if (!row) return null;
+    if (row.part) return new Uint8Array(row.part);
+    return row.storageObjectId ? this.files.getRange(row.storageObjectId, start, end) : null;
   }
 
   async objectIdsOf(ids: readonly string[]): Promise<Map<string, string>> {
