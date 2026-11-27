@@ -1,16 +1,18 @@
 import { DomainError } from '../../../shared-kernel';
-import { checkImage, IMAGE_EXTENSIONS } from '../domain/image-file';
+import { checkImage, checkVideo, MEDIA_EXTENSIONS } from '../domain/image-file';
 
 export { IMAGE_HARD_LIMIT_BYTES } from '../domain/image-file';
 import { DownloadLimits, Hasher, Ids, ImageAddresses, MediaStore, PublicFileUrls, RemoteFiles } from './ports';
 
-const FILE = /^([0-9a-f-]{36})\.([a-z]{3,4})$/;
+const FILE = /^([0-9a-f-]{36})\.([a-z0-9]{3,4})$/;
 const MAX_URL = 2000;
 
 /** The address a stored photo is served at, relative to each portal. */
+export { VIDEO_HARD_LIMIT_BYTES } from '../domain/image-file';
+
 export const mediaPath = (id: string, extension: string): string => `/media/${id}.${extension}`;
 
-const PATH = /^\/media\/([0-9a-f-]{36})\.[a-z]{3,4}$/;
+const PATH = /^\/media\/([0-9a-f-]{36})\.[a-z0-9]{3,4}$/;
 /** Public addresses change only when staff change a storage location or move files. */
 const ADDRESS_TTL_MS = 60_000;
 const ADDRESS_CACHE_SIZE = 10_000;
@@ -93,12 +95,36 @@ export class ProductMediaService implements ImageAddresses {
     return mediaPath(saved.id, saved.extension);
   }
 
-  /** The photo behind a served file name such as "<id>.jpg". Null for anything unknown or malformed. */
+  /** Stores a video sent from Admin and returns the address to put on a product. */
+  async uploadVideo(content: Uint8Array, maxBytes: number): Promise<string> {
+    const { contentType, extension } = checkVideo(content, maxBytes);
+    const saved = await this.store.save({ id: this.ids.uuid(), sha256: this.hasher.sha256(content), contentType, extension, content, sourceUrl: null });
+    return mediaPath(saved.id, saved.extension);
+  }
+
+  /** The photo or video behind a served file name such as "<id>.jpg". Null for anything unknown or malformed. */
   async read(fileName: string): Promise<{ contentType: string; content: Uint8Array } | null> {
+    const id = await this.idOf(fileName);
+    if (!id) return null;
+    return this.store.read(id);
+  }
+
+  /** Type and size, to answer range requests without reading the file. */
+  async info(fileName: string): Promise<{ contentType: string; sizeBytes: number } | null> {
     const match = FILE.exec(fileName);
-    if (!match || !IMAGE_EXTENSIONS[match[2]!]) return null;
-    const media = await this.store.read(match[1]!);
-    return media && media.contentType === IMAGE_EXTENSIONS[match[2]!] ? media : null;
+    if (!match || !MEDIA_EXTENSIONS[match[2]!]) return null;
+    const info = await this.store.info(match[1]!);
+    return info && info.contentType === MEDIA_EXTENSIONS[match[2]!] ? info : null;
+  }
+
+  /** Bytes start to end (both included): how browsers stream video and let shoppers skip ahead. */
+  async readRange(fileName: string, start: number, end: number): Promise<Uint8Array | null> {
+    const id = await this.idOf(fileName);
+    return id ? this.store.readRange(id, start, end) : null;
+  }
+
+  private async idOf(fileName: string): Promise<string | null> {
+    return (await this.info(fileName)) ? FILE.exec(fileName)![1]! : null;
   }
 
   private checkUrl(raw: string, allowHttp: boolean): string {

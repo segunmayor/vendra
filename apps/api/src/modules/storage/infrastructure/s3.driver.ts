@@ -54,6 +54,18 @@ export class S3Driver implements StorageDriver {
     return reply.Body.transformToByteArray();
   }
 
+  async getRange(key: string, start: number, end: number): Promise<Uint8Array> {
+    const reply = await this.run(() =>
+      this.client.send(new GetObjectCommand({ Bucket: this.settings.bucket, Key: key, Range: `bytes=${start}-${end}` }), { abortSignal: AbortSignal.timeout(TIMEOUT_MS) }),
+    );
+    if (!reply.Body) throw new StorageUnavailable('The storage service returned an empty file.');
+    const bytes = await reply.Body.transformToByteArray();
+    // Some services ignore the range (even while saying they honoured it) and send the whole
+    // file: take the part asked for.
+    const wanted = end - start + 1;
+    return bytes.length > wanted && bytes.length > end ? bytes.subarray(start, end + 1) : bytes;
+  }
+
   async delete(key: string): Promise<void> {
     await this.run(() => this.client.send(new DeleteObjectCommand({ Bucket: this.settings.bucket, Key: key }), { abortSignal: AbortSignal.timeout(TIMEOUT_MS) }));
   }

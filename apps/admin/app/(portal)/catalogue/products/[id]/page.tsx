@@ -18,6 +18,8 @@ import {
 } from '../actions';
 import { AttributeFields } from '../attribute-fields';
 import { Photos } from '../photos';
+import { Videos } from '../videos';
+import { getPublicSettings } from '@vendra/portal-session/server';
 
 export const metadata: Metadata = { title: 'Product' };
 
@@ -51,6 +53,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     inventory ? session.read((api) => api.GET('/v1/admin/warehouses')) : Promise.resolve([]),
   ]);
   if (!product) notFound();
+  const configured = (await getPublicSettings())['media.maxVideosPerProduct'];
+  const videoLimit = typeof configured === 'number' ? configured : 3;
   const category = categories.find((entry) => entry.id === product.categoryId);
   const listingFor = new Map(listings.map((listing) => [listing.variantId, listing]));
   const warehouseName = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse.name]));
@@ -99,6 +103,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
       <section aria-labelledby="photos" className="mb-6">
         <Photos productId={product.id} images={product.images} published={product.status === 'published'} />
+      </section>
+      <section aria-labelledby="videos" className="mb-6">
+        <Videos productId={product.id} videos={product.videos} limit={videoLimit} />
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">

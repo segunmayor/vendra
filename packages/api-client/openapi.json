@@ -1699,6 +1699,96 @@
         ]
       }
     },
+    "/v1/admin/products/{id}/videos": {
+      "post": {
+        "operationId": "adminUploadProductVideo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadVideoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a video, after the others",
+        "tags": [
+          "admin catalogue"
+        ]
+      },
+      "put": {
+        "operationId": "adminArrangeProductVideos",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArrangeVideosDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reorder or remove videos",
+        "tags": [
+          "admin catalogue"
+        ]
+      }
+    },
     "/v1/store/media/{file}": {
       "get": {
         "operationId": "storeGetMedia",
@@ -1745,11 +1835,32 @@
                   "type": "string",
                   "format": "binary"
                 }
+              },
+              "video/mp4": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "video/webm": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "video/quicktime": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
               }
             }
+          },
+          "206": {
+            "description": "Part of the file, for a Range request"
           }
         },
-        "summary": "A product photo, by the file name in a product image address",
+        "summary": "A product photo or video, by the file name in its address. Supports byte ranges.",
         "tags": [
           "store catalogue"
         ]
@@ -5903,6 +6014,13 @@
               "type": "string"
             }
           },
+          "videos": {
+            "description": "Video addresses (/media/<id>.mp4) in display order",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "version": {
             "type": "number"
           }
@@ -5917,6 +6035,7 @@
           "status",
           "variants",
           "images",
+          "videos",
           "version"
         ]
       },
@@ -6001,6 +6120,34 @@
         },
         "required": [
           "images"
+        ]
+      },
+      "UploadVideoDto": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "An MP4, MOV or WebM video"
+          }
+        },
+        "required": [
+          "file"
+        ]
+      },
+      "ArrangeVideosDto": {
+        "type": "object",
+        "properties": {
+          "videos": {
+            "description": "The videos to keep, in display order. Only videos the product already has.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "videos"
         ]
       },
       "FieldSpecResponse": {
@@ -6916,6 +7063,13 @@
               "type": "string"
             }
           },
+          "videos": {
+            "description": "Video addresses in display order. Play with <video>; byte ranges are supported.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "attributes": {
             "type": "array",
             "items": {
@@ -6951,6 +7105,7 @@
           "category",
           "breadcrumb",
           "images",
+          "videos",
           "attributes",
           "priceFrom",
           "priceTo",

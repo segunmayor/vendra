@@ -74,6 +74,9 @@ export interface MediaStore {
   /** Stores the file once per sha256. Saving bytes already stored returns the existing record. */
   save(media: { id: string; sha256: string; contentType: string; extension: string; content: Uint8Array; sourceUrl: string | null }): Promise<StoredMedia>;
   read(id: string): Promise<{ contentType: string; content: Uint8Array } | null>;
+  info(id: string): Promise<{ contentType: string; sizeBytes: number } | null>;
+  /** Bytes start to end (both included), reading no more than needed. */
+  readRange(id: string, start: number, end: number): Promise<Uint8Array | null>;
   /** The stored object behind each photo kept in a storage location. Photos in the database are left out. */
   objectIdsOf(ids: readonly string[]): Promise<Map<string, string>>;
 }

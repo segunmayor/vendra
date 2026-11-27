@@ -145,6 +145,7 @@ export class PostgresProductSearch implements ProductSearch {
       name: row.name,
       description: row.description,
       images: images(row.images),
+      videos: images(row.videos),
       attributes: row.attributes as Record<string, AttributeValue>,
       category: { id: row.category.id, name: row.category.name, slug: row.category.slug },
       brand: row.brand ? { id: row.brand.id, name: row.brand.name, slug: row.brand.slug } : null,

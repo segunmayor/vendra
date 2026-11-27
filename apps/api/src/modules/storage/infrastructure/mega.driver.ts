@@ -65,6 +65,16 @@ export class MegaDriver implements StorageDriver {
     });
   }
 
+  getRange(key: string, start: number, end: number): Promise<Uint8Array> {
+    return this.serial(async () => {
+      const file = await this.fileFor(key);
+      if (!file) throw new StorageUnavailable('The file is not in the MEGA folder. It may have been deleted there.');
+      // megajs counts `end` as included, like HTTP ranges, but reads an `end` of 0 as "to the
+      // end of the file": trim to the bytes asked for.
+      return new Uint8Array(await file.downloadBuffer({ start, end })).subarray(0, end - start + 1);
+    });
+  }
+
   delete(key: string): Promise<void> {
     return this.serial(async () => {
       const file = await this.fileFor(key);

@@ -89,6 +89,8 @@ export class ProductResponse {
   @ApiProperty({ type: [VariantResponse] }) variants!: VariantResponse[];
   @ApiProperty({ type: [String], description: 'Photo addresses in display order; the first is the main photo. /media/... addresses are served by each portal.' })
   images!: string[];
+  @ApiProperty({ type: [String], description: 'Video addresses (/media/<id>.mp4) in display order' })
+  videos!: string[];
   @ApiProperty() version!: number;
 }
 

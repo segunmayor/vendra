@@ -42,18 +42,20 @@ export function text(values: PublicSettings, key: string, fallback = ''): string
   return typeof value === 'string' ? value : fallback;
 }
 
-const MEDIA_FILE = /^[0-9a-f-]{36}\.(?:jpg|png|gif|webp|avif)$/;
+const MEDIA_FILE = /^[0-9a-f-]{36}\.(?:jpg|png|gif|webp|avif|mp4|webm|mov)$/;
 
 /**
  * GET handler body for app/media/[file]/route.ts: a product photo from the API, served from the
  * portal's own address so product image paths ("/media/<id>.jpg") work in every portal. Photos
  * kept behind a CDN are redirected there.
  */
-export async function mediaFile(file: string): Promise<Response> {
+export async function mediaFile(file: string, request?: Request): Promise<Response> {
   if (!MEDIA_FILE.test(file)) return new Response('Not found', { status: 404 });
   let upstream: Response;
   try {
-    upstream = await fetch(`${settings().apiBaseUrl}/v1/store/media/${file}`, { cache: 'no-store', redirect: 'manual' });
+    // Videos are read in ranges, so they start quickly and can be skipped through.
+    const range = request?.headers.get('range');
+    upstream = await fetch(`${settings().apiBaseUrl}/v1/store/media/${file}`, { cache: 'no-store', redirect: 'manual', headers: range ? { range } : {} });
   } catch {
     return new Response('Unavailable', { status: 503 });
   }
@@ -63,9 +65,19 @@ export async function mediaFile(file: string): Promise<Response> {
   if (upstream.status >= 300 && upstream.status < 400 && location && /^(https:\/\/|http:\/\/(localhost|127\.0\.0\.1)[:/])/i.test(location)) {
     return new Response(null, { status: 302, headers: { location, 'cache-control': upstream.headers.get('cache-control') ?? 'public, max-age=3600' } });
   }
+  if (upstream.status === 416) {
+    return new Response(null, { status: 416, headers: { 'content-range': upstream.headers.get('content-range') ?? '' } });
+  }
   if (!upstream.ok || !upstream.body) return new Response('Not found', { status: upstream.status === 404 ? 404 : 502 });
+  const partial: Record<string, string> = {};
+  for (const name of ['content-range', 'content-length', 'accept-ranges']) {
+    const value = upstream.headers.get(name);
+    if (value) partial[name] = value;
+  }
   return new Response(upstream.body, {
+    status: upstream.status === 206 ? 206 : 200,
     headers: {
+      ...partial,
       'content-type': upstream.headers.get('content-type') ?? 'application/octet-stream',
       // A stored photo never changes; a new photo gets a new name.
       'cache-control': 'public, max-age=31536000, immutable',

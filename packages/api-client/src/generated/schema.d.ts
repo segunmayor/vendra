@@ -703,6 +703,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/products/{id}/videos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder or remove videos */
+        put: operations["adminArrangeProductVideos"];
+        /** Add a video, after the others */
+        post: operations["adminUploadProductVideo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/store/media/{file}": {
         parameters: {
             query?: never;
@@ -710,7 +728,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A product photo, by the file name in a product image address */
+        /** A product photo or video, by the file name in its address. Supports byte ranges. */
         get: operations["storeGetMedia"];
         put?: never;
         post?: never;
@@ -2149,6 +2167,8 @@ export interface components {
             variants: components["schemas"]["VariantResponse"][];
             /** @description Photo addresses in display order; the first is the main photo. /media/... addresses are served by each portal. */
             images: string[];
+            /** @description Video addresses (/media/<id>.mp4) in display order */
+            videos: string[];
             version: number;
         };
         ProductDetailsDto: {
@@ -2180,6 +2200,17 @@ export interface components {
         ArrangePhotosDto: {
             /** @description The photos to keep, in display order. Only photos the product already has. */
             images: string[];
+        };
+        UploadVideoDto: {
+            /**
+             * Format: binary
+             * @description An MP4, MOV or WebM video
+             */
+            file: string;
+        };
+        ArrangeVideosDto: {
+            /** @description The videos to keep, in display order. Only videos the product already has. */
+            videos: string[];
         };
         FieldSpecResponse: {
             key: string;
@@ -2453,6 +2484,8 @@ export interface components {
             category: components["schemas"]["RefDto"];
             breadcrumb: components["schemas"]["RefDto"][];
             images: string[];
+            /** @description Video addresses in display order. Play with <video>; byte ranges are supported. */
+            videos: string[];
             attributes: components["schemas"]["AttributeDto"][];
             priceFrom: components["schemas"]["MoneyDto"];
             priceTo: components["schemas"]["MoneyDto"];
@@ -4276,6 +4309,56 @@ export interface operations {
             };
         };
     };
+    adminArrangeProductVideos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArrangeVideosDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductResponse"];
+                };
+            };
+        };
+    };
+    adminUploadProductVideo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["UploadVideoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductResponse"];
+                };
+            };
+        };
+    };
     storeGetMedia: {
         parameters: {
             query?: never;
@@ -4297,7 +4380,17 @@ export interface operations {
                     "image/gif": string;
                     "image/webp": string;
                     "image/avif": string;
+                    "video/mp4": string;
+                    "video/webm": string;
+                    "video/quicktime": string;
                 };
+            };
+            /** @description Part of the file, for a Range request */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
